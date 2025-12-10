@@ -1,4 +1,7 @@
-# Flowmora Browser 🌐
+# Flowmora Browser 
+
+
+![Uploading Gemini_Generated_Image_c9kz7jc9kz7jc9kz-removebg-preview.png…]()
 
 A modern, secure Chromium-based desktop browser built with Electron. Features intelligent Knowledge Mode for automatic content classification and a rule-based page summarizer.
 
