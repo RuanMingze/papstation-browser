@@ -1,0 +1,29 @@
+{
+  "name": "flowmora-browser",
+  "version": "1.0.0",
+  "description": "A secure Chromium-based desktop browser built with Electron",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "NODE_ENV=development electron ."
+  },
+  "keywords": [
+    "browser",
+    "electron",
+    "chromium",
+    "flowmora"
+  ],
+  "author": "Piyush Yadav <piyushrajyadav@github.com>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/piyushrajyadav/flowmora-browser.git"
+  },
+  "homepage": "https://github.com/piyushrajyadav/flowmora-browser#readme",
+  "bugs": {
+    "url": "https://github.com/piyushrajyadav/flowmora-browser/issues"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^33.2.0"
+  }
+}
