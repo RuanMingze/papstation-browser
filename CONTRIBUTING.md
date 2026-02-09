@@ -1,4 +1,4 @@
-# Contributing to Papstation Browser
+# Contributing to Papstation Browser 贡献指南
 
 Thank you for your interest in contributing to Papstation Browser! 🎉
 
