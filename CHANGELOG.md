@@ -1,84 +1,93 @@
-# Changelog
+# 更新日志
 
-All notable changes to Papstation Browser will be documented in this file.
+所有与 Papstation 浏览器相关的重大变更都将记录在此文件中。
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+此格式基于 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)，
+并且此项目遵循 [语义化版本控制](https://semver.org/spec/v2.0.0.html)。
 
-## [1.0.0] - 2026-02-09
+## [1.0.5] - 2026-02-09
 
-### 🎉 Initial Release of Papstation Browser
+### 🐛 错误修复
 
-#### Based on Flowmora Browser
+- **修复新窗口链接** - 解决了带有 `target="_blank"` 的链接无法在新标签页中打开的问题
+- **改进错误处理** - 修改了错误处理逻辑，在 WebView 区域内使用 iframe 显示错误页面，而不是重定向
+- **地址栏功能修复** - 解决了在地址栏输入什么都会当作http/https链接处理的问题
+- **下载功能修复** - 解决了点击下载按钮无法弹出菜单和下载一个文件菜单里出现两个相同下载项的问题
+- **隐身模式窗口修复** - 解决了在隐身模式点击关闭按钮时，关闭的是主窗口的问题
 
-Papstation Browser is based on Flowmora Browser, which is licensed under the MIT License.
+### ✨ 功能增强
 
-#### Added
-- **Core Browser Features**
-  - Tabbed browsing with smooth animations
-  - Address bar with security indicator
-  - Navigation controls (back, forward, reload, home)
-  - Bookmarks bar and bookmark management
-  - History tracking with recently closed tabs
-  - Quick shortcuts on new tab page
+- **错误页面改进** - 为所有错误页面添加了游戏提示和启动按钮：
+  - 添加了"要想在等待时玩游戏吗？"提示文本
+  - 添加了"立即启动"按钮，点击后进入 Chrome 恐龙游戏
+  - 确保按钮顺序一致（刷新按钮在前，立即启动按钮在后）
+  - 在设置页面添加了启用预设主页开关，启用后就可以享受极简主页
 
-- **Knowledge Mode** 🧠
-  - Auto-capture content from visited pages
-  - Organize knowledge by subjects and topics
-  - Search through saved knowledge
-  - Export as "My Knowledge Book" (PDF/HTML)
+### 技术变更
 
-- **Page Summarization** 📝
-  - Rule-based offline summarizer
-  - Extracts 5 key bullet points
-  - Identifies 3 key definitions
-  - Finds 2 real-world examples
+- **更新错误处理逻辑** - 修改 `renderer.js` 使用 iframe 显示错误页面
+- **增强链接处理** - 改进了对应在新标签页打开的链接的检测和处理
+- **游戏区域样式** - 更新 CSS 使用 Flexbox 使游戏区域居中
 
-- **Privacy & Security** 🔒
-  - Incognito mode with ephemeral sessions
-  - Context isolation enabled
-  - Node integration disabled
-  - Secure preload scripts
+## [1.0.0] - 2024-12-11
 
-- **Theming** 🎨
-  - Premium dark theme (Dracula-inspired)
-  - Clean light theme
-  - Smooth theme transitions
+### 🎉 Papstation 浏览器初始发布
 
-- **Settings Panel** ⚙️
-  - Search engine selection (including ChickRubGo)
-  - Theme preference
-  - Privacy controls
-  - Download location
+#### 基于 Flowmora 浏览器
 
-- **Downloads Manager** 📥
-  - Download progress tracking
-  - Pause/resume/cancel downloads
-  - Open file or show in folder
+Papstation 浏览器基于 Flowmora 浏览器，后者在 MIT 许可证下发布。
 
-- **Papstation Exclusive Features**
-  - **ChickRubGo Search Engine** 🐔 - Integrated search engine
-  - **Full Chinese Localization** 🌍 - Complete Chinese language support
-  - **Enhanced Relative Path Handling** - Improved navigation for relative URLs
-  - **Updated Electron** - Built with Electron 40.1.0
+#### 新增功能
+- **核心浏览器功能**
+  - 带有平滑动画的标签式浏览
+  - 带安全指示器的地址栏
+  - 导航控制（后退、前进、刷新、主页）
+  - 书签栏和书签管理
+  - 历史记录跟踪与最近关闭的标签页
+  - 新标签页上的快速快捷方式
 
-### Technical
-- Built with Electron 40.1.0
-- Windows installer (NSIS)
-- ASAR packaging enabled
-- Maximum compression
+- **知识模式** 🧠
+  - 自动捕获访问页面的内容
+  - 按主题和话题组织知识
+  - 搜索保存的知识
+  - 导出为"我的知识书"（PDF/HTML）
 
----
+- **页面摘要** 📝
+  - 基于规则的离线摘要器
+  - 提取 5 个关键要点
+  - 识别 3 个关键定义
+  - 找出 2 个实际示例
 
-## Future Roadmap
+- **隐私与安全** 🔒
+  - 带有临时会话的隐身模式
+  - 启用上下文隔离
+  - 禁用节点集成
+  - 安全的预加载脚本
 
-### [1.1.0] - Planned
-- [ ] Extensions support
-- [ ] Sync across devices
-- [ ] Reading mode
-- [ ] PDF viewer improvements
+- **主题** 🎨
+  - 高级深色主题（灵感来自 Dracula）
+  - 简洁的浅色主题
+  - 平滑的主题过渡
 
-### [1.2.0] - Planned
-- [ ] macOS support
-- [ ] Linux support
-- [ ] Multiple profiles
+- **设置面板** ⚙️
+  - 搜索引擎选择（包括 ChickRubGo）
+  - 主题偏好
+  - 隐私控制
+  - 下载位置
+
+- **下载管理器** 📥
+  - 下载进度跟踪
+  - 暂停/恢复/取消下载
+  - 打开文件或在文件夹中显示
+
+- **Papstation 独家功能**
+  - **ChickRubGo 搜索引擎** 🐔 - 集成搜索引擎
+  - **完整中文本地化** 🌍 - 完整的中文语言支持
+  - **增强的相对路径处理** - 改进了相对 URL 的导航
+  - **更新的 Electron** - 基于 Electron 40.1.0 构建
+
+### 技术
+- 基于 Electron 40.1.0 构建
+- Windows 安装程序（NSIS）
+- 启用 ASAR 打包
+- 最大压缩

@@ -6,13 +6,13 @@
     <title>410 Gone - PapStation</title>
     <link rel="icon" href="../Error.png" type="image/png">
     <link rel="stylesheet" href="../style.css">
-    <link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/aos/2.3.4/aos.css">
-    <script src="https://cdn.bootcdn.net/ajax/libs/aos/2.3.4/aos.js"></script>
+    <link rel="stylesheet" href="./aos.css">
+    <script src="./aos.js"></script>
     <style>
         body {
             font-family: 'PingFang SC', 'Helvetica Neue', Arial, sans-serif;
             background-color: #f8f9fa;
-            background-image: url('https://luckycola.com.cn/public/imgs/luckycola_Imghub_forever_cjIr5FKD17701864981356073.png');
+            background-image: url('./Wallpaper.png');
             background-size: cover;
             background-position: center;
             background-repeat: no-repeat;
@@ -245,9 +245,12 @@
                 <li>GitHub 仓库 / 文件被所有者永久删除</li>
             </ul>
         </div>
+        <p class="error-description" data-aos="fade-up" data-aos-duration="1000" data-aos-delay="550">
+            要想在等待时玩游戏吗？
+        </p>
         <div class="btn-group" data-aos="fade-up" data-aos-duration="1000" data-aos-delay="600">
-            <a href="https://ruanmingze.github.io/ChickRubGo/" class="btn btn-primary">返回首页</a>
-            
+            <button class="btn btn-primary" onclick="location.reload()">刷新</button>
+            <a href="./chrome-dinosaur-game/index.html" class="btn btn-secondary" target="_blank">立即启动</a>
         </div>
     </div>
     <div class="footer">

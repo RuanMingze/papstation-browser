@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Papstation 主页</title>
+    <icon src="assets/icon.png" type="image/png"></icon>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #1a1a1a;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            color: #fff;
+            text-align: center;
+            padding: 100px 20px 20px;
+        }
+
+        .container {
+            max-width: 700px;
+            width: 100%;
+        }
+
+        .app-icon {
+            -webkit-user-drag: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            margin-bottom: 52px;
+        }
+
+        .search-container {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 20px;
+            color: #999;
+            z-index: 1;
+        }
+
+        .search-input {
+            flex: 1;
+            padding: 16px 20px 16px 50px;
+            border: 1px solid #333;
+            border-radius: 24px 0 0 24px;
+            font-size: 16px;
+            background: #2d2d2d;
+            color: #fff;
+            transition: all 0.3s ease;
+            height: 50px;
+            box-sizing: border-box;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: #666;
+            box-shadow: 0 0 0 2px rgba(102, 102, 102, 0.2);
+        }
+
+        .search-input::placeholder {
+            color: #999;
+        }
+
+        .search-button {
+            padding: 0 24px;
+            border: 1px solid #333;
+            border-left: none;
+            border-radius: 0 24px 24px 0;
+            font-size: 16px;
+            background: #3d3d3d;
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-sizing: border-box;
+        }
+
+        .search-button:hover {
+            background: #4d4d4d;
+        }
+
+        .search-button:active {
+            background: #5d5d5d;
+        }
+
+        .search-container i {
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 18px;
+            color: #999;
+        }
+
+        @media (max-width: 768px) {
+            .app-icon {
+                font-size: 48px;
+                margin-bottom: 30px;
+            }
+
+            .search-input {
+                padding: 14px 18px;
+                font-size: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="app-icon">
+            <img src="assets/icon.png" alt="Papstation" width="128" height="128">
+        </div>
+        <div class="search-container">
+            <i class="fas fa-search search-icon"></i>
+            <input type="text" class="search-input" placeholder="搜索网页..." autofocus>
+            <button class="search-button">搜索</button>
+        </div>
+    </div>
+
+    <script>
+        // 获取搜索引擎设置（从URL查询参数中获取）
+        function getSearchEngine() {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get('searchEngine') || 'bing';
+        }
+
+        // 执行搜索
+        function performSearch() {
+            const input = document.querySelector('.search-input');
+            const query = input.value.trim();
+            if (query) {
+                const engine = getSearchEngine();
+                let url = '';
+                
+                switch (engine) {
+                    case 'baidu':
+                        url = `https://www.baidu.com/s?wd=${encodeURIComponent(query)}`;
+                        break;
+                    case 'bing':
+                        url = `https://www.bing.com/search?q=${encodeURIComponent(query)}`;
+                        break;
+                    case 'google':
+                        url = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+                        break;
+                    case 'duckduckgo':
+                        url = `https://duckduckgo.com/?q=${encodeURIComponent(query)}`;
+                        break;
+                    case 'brave':
+                        url = `https://search.brave.com/search?q=${encodeURIComponent(query)}`;
+                        break;
+                    case 'chickrubgo':
+                        url = `https://ruanmingze.github.io/ChickRubGo/search?q=${encodeURIComponent(query)}`;
+                        break;
+                    default:
+                        url = `https://www.baidu.com/s?wd=${encodeURIComponent(query)}`;
+                }
+                
+                window.location.href = url;
+            }
+        }
+
+        // 搜索功能
+        document.querySelector('.search-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                performSearch();
+            }
+        });
+
+        // 搜索按钮点击事件
+        document.querySelector('.search-button').addEventListener('click', performSearch);
+    </script>
+</body>
+</html>

@@ -88,8 +88,15 @@ contextBridge.exposeInMainWorld('focusFlowAPI', {
         minimize: () => ipcRenderer.invoke('window-minimize'),
         maximize: () => ipcRenderer.invoke('window-maximize'),
         close: () => ipcRenderer.invoke('window-close')
+    },
+
+    // ============================================
+    // Webview Control API
+    // ============================================
+    webview: {
+        goBack: (webviewId) => ipcRenderer.invoke('webview-go-back', webviewId),
+        goForward: (webviewId) => ipcRenderer.invoke('webview-go-forward', webviewId),
+        savePage: (webviewId) => ipcRenderer.invoke('webview-save-page', webviewId),
+        openDevTools: (webviewId) => ipcRenderer.invoke('webview-open-devtools', webviewId)
     }
 });
-
-// Log when preload script is ready (for debugging)
-console.log('Flowmora Browser preload script loaded successfully');

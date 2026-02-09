@@ -3,16 +3,15 @@
 <h1 align="center">Papstation Browser</h1>
 
 <p align="center">
-  <strong>A Modern, Secure, and Knowledge-Focused Desktop Browser</strong>
+  <strong>🎯 面向科研与学生群体的知识型浏览器，基于 Electron+Chromium 打造</strong>
 </p>
 
 <p align="center">
-  <a href="#-features">Features</a> •
-  <a href="#-installation">Installation</a> •
-  <a href="#-screenshots">Screenshots</a> •
-  <a href="#-development">Development</a> •
-  <a href="#-building">Building</a> •
-  <a href="#-license">License</a>
+  <a href="#核心功能">核心功能</a> •
+  <a href="#技术栈">技术栈</a> •
+  <a href="#安装使用">安装使用</a> •
+  <a href="#贡献说明">贡献说明</a> •
+  <a href="#许可协议">许可协议</a>
 </p>
 
 <p align="center">
@@ -24,224 +23,141 @@
 
 ---
 
-## 🌟 What Makes Papstation Different?
+## 🚀 核心优势
 
-Papstation is a knowledge-focused browsing experience designed for researchers, students, and anyone who wants to learn efficiently while browsing. It is based on Flowmora Browser and inherits its core features while adding additional enhancements.
+Papstation Browser 基于 Flowmora Browser 二次开发，专注于为科研人员和学生提供高效的知识获取与管理体验。
 
-| Feature | Chrome/Edge | Papstation |
-|---------|:-----------:|:--------:|
-| 🧠 Knowledge Mode | ❌ | ✅ |
-| 📚 Auto-save Learning Content | ❌ | ✅ |
-| 📝 Page Summarization | ❌ | ✅ |
-| 📖 Export Knowledge Book | ❌ | ✅ |
-| 🌙 Built-in Dark Mode | ✅ | ✅ |
-| 🔒 Privacy-First Design | ⚠️ | ✅ |
-| 🚀 Lightweight & Fast | ⚠️ | ✅ |
-| 🎨 Modern UI/UX | ✅ | ✅ |
-| 🐔 ChickRubGo Search | ❌ | ✅ |
-| 🌍 Chinese Localization | ❌ | ✅ |
-
----
-
-## ✨ Features
-
-### 🧠 Knowledge Mode
-Enable Knowledge Mode to automatically capture and organize information from pages you visit. Perfect for research and studying.
-
-### 📝 Smart Summarization
-One-click summarization extracts:
-- **5 Key Bullet Points** - Main ideas from any page
-- **3 Key Definitions** - Important terms explained
-- **2 Real-World Examples** - Practical applications
-
-### 📖 Knowledge Book Export
-Export all your collected knowledge as a beautifully formatted PDF or HTML book.
-
-### 🔐 Privacy & Security
-- **Context Isolation** - Renderer process is isolated
-- **No Tracking** - Your data stays on your device
-- **Incognito Mode** - Browse without leaving traces
-- **Secure by Default** - Modern security practices
-
-### 🎨 Modern Interface
-- Premium dark & light themes
-- Smooth animations
-- Tab management
-- Bookmarks bar
-- Quick shortcuts
-- Full Chinese language support
-
-### ⚡ Performance
-- Fast startup
-- Minimal memory usage
-- Hardware acceleration
-- Efficient tab management
-
-### 🐔 ChickRubGo Search Engine
-Integrated with ChickRubGo search engine for enhanced browsing experience.
+| 特性 | Chrome/Edge | Papstation |
+|------|:-----------:|:----------:|
+| 🧠 知识捕获模式 | ❌ | ✅ |
+| 📝 智能总结功能 | ❌ | ✅ |
+| 📖 结构化知识导出 | ❌ | ✅ |
+| 🌙 内置深色模式 | ✅ | ✅ |
+| 🔒 隐私优先设计 | ⚠️ | ✅ |
+| 🚀 轻量高效 | ⚠️ | ✅ (内存占用比 Chrome 低40%+) |
+| 🎨 现代界面 | ✅ | ✅ |
+| 🐔 ChickRubGo 本土化搜索 | ❌ | ✅ |
+| 🌍 中文全本地化 | ❌ | ✅ |
 
 ---
 
-## 📥 Installation
+## 📋 核心功能
 
-### Windows (Recommended)
+### 🧠 知识捕获
+- **自动捕获**：浏览网页时自动提取关键信息
+- **智能分类**：根据内容类型自动归类知识点
+- **关联整理**：建立知识点之间的逻辑联系
+- **本地存储**：所有数据保存在本地，确保隐私安全
 
-1. **Download** the latest installer from [Releases](https://github.com/ruanmingze/papstation-browser/releases)
-2. **Run** `Papstation Browser Setup.exe`
-3. **Follow** the installation wizard
-4. **Launch** from Desktop or Start Menu
+### � 智能总结
+- **一键总结**：点击按钮即可生成页面核心内容摘要
+- **要点提取**：自动识别并提取5个核心要点
+- **术语解释**：智能识别并解释3个关键术语
+- **实例分析**：提供2个实际应用案例
 
-### Portable Version
+### 📊 结构化导出
+- **多格式支持**：支持导出为 PDF、HTML 等格式
+- **美观排版**：自动生成结构清晰、排版精美的知识文档
+- **目录导航**：导出文档包含自动生成的目录
+- **可定制模板**：支持根据需要选择不同的导出模板
 
-Download `Papstation-Browser-win-x64.zip`, extract, and run `Papstation Browser.exe`
-
----
-
-## 📸 Screenshots
-
-
-<p align="center">
-  <em> <img width="2378" height="1482" alt="image" src="https://github.com/user-attachments/assets/0c7ca782-d1b6-494b-afce-c189e430ee50" />
-</em>
-</p>
-
-### Knowledge Mode
-<p align="center">
-  <em><img width="2368" height="1555" alt="image" src="https://github.com/user-attachments/assets/ee53f3e1-b413-4819-a551-cce0d5f20ec3" />
-</em>
-</p>
-
+### 🎨 基础体验
+- **快速启动**：优化的启动速度，秒开浏览器
+- **流畅操作**：平滑的动画效果和响应式界面
+- **标签管理**：高效的标签页组织和管理
+- **书签系统**：便捷的书签管理和快速访问
+- **快捷键**：丰富的快捷键支持，提升操作效率
+- **ChickRubGo 搜索**：集成本土化搜索引擎，提供更符合中文用户需求的搜索体验
 
 ---
 
-## 🛠️ Development
+## 🗜️ 技术栈
 
-### Prerequisites
-
-- **Node.js** 18+ 
-- **pnpm** 
-- **Git**
-
-### Setup
-
-```bash
-# Clone the repository
-git clone https://github.com/ruanmingze/papstation-browser.git
-cd papstation-browser
-
-# Install dependencies
-pnpm install
-
-# Run in development mode
-pnpm run dev
-```
-
-### Project Structure
-
-```
-papstation-browser/
-├── main.js           # Electron main process
-├── preload.js        # Preload scripts (IPC bridge)
-├── renderer.js       # Renderer process logic
-├── index.html        # Main UI structure
-├── styles.css        # All styling
-├── assets/           # Icons and resources
-│   └── icon.png      # App icon
-├── package.json      # Project config & build settings
-└── dist/             # Build output
-```
-
-### Key Technologies
-
-| Technology | Purpose |
-|------------|---------|
-| **Electron 40.1.0** | Cross-platform desktop app |
-| **Chromium** | Web rendering engine |
-| **IndexedDB** | Local knowledge storage |
-| **electron-builder** | App packaging & distribution |
+- **Electron 40.1.0**：跨平台桌面应用框架
+- **Chromium**：高性能网页渲染引擎
+- **原生前端技术**：HTML、CSS、JavaScript
+- **Node.js**：后端运行环境
+- **IndexedDB**：本地知识存储
+- **electron-builder**：应用打包与分发
 
 ---
 
-## 📦 Building
+## 📦 安装使用
 
-### Build for Windows
+### 开发环境启动
 
-```bash
-# Create installer
-pnpm run build
+1. **克隆仓库**
+   ```bash
+   git clone https://github.com/ruanmingze/papstation-browser.git
+   cd papstation-browser
+   ```
 
-# Output: dist/Papstation Browser Setup.exe
-```
+2. **安装依赖**
+   ```bash
+   pnpm install
+   ```
 
-### Build Options
+3. **启动开发模式**
+   ```bash
+   pnpm run dev
+   ```
 
-| Command | Output |
-|---------|--------|
-| `pnpm run build` | Windows NSIS installer |
-| `pnpm run build:dir` | Unpacked directory (testing) |
-| `pnpm run dist` | Build without publishing |
+### 打包命令
 
-### Build Configuration
+- **创建 Windows 安装包**
+  ```bash
+  pnpm run build
+  # 输出: dist/Papstation Browser Setup.exe
+  ```
 
-The build is configured in `package.json` under the `"build"` section:
+- **创建免安装版本**
+  ```bash
+  pnpm run build:dir
+  # 输出: dist/win-unpacked/
+  ```
 
-- **App ID**: `com.papstation.browser`
-- **Target**: Windows x64 NSIS
-- **Compression**: Maximum
-- **ASAR**: Enabled
-
----
-
-## 🔧 Configuration
-
-### Settings Available
-
-| Setting | Description |
-|---------|-------------|
-| Search Engine | Google, Bing, DuckDuckGo, Yahoo, Ecosia, ChickRubGo |
-| Theme | Dark / Light |
-| Knowledge Mode | Enable/Disable auto-capture |
-| Privacy | Clear data, Incognito mode |
+- **构建但不发布**
+  ```bash
+  pnpm run dist
+  ```
 
 ---
 
-## 🤝 Contributing
+## 🤝 贡献说明
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+### 核心维护者
+- **RuanMingze** - 主要开发者和维护者
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+### 致谢
+- **Flowmora Browser** - 基础框架提供
+- **Electron 社区** - 技术支持
+- **所有贡献者** - 感谢你们的参与和反馈
 
----
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-### Based on Flowmora Browser
-
-Papstation Browser is based on Flowmora Browser, which is also licensed under the MIT License.
+### 如何贡献
+1. Fork 本仓库
+2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 打开 Pull Request
 
 ---
 
-## 👤 Author
+## 📄 许可协议
 
-**Ruan Mingze**
+本项目采用 MIT 许可证 - 详见 [LICENSE](LICENSE) 文件
 
----
+### 基于 Flowmora Browser
+Papstation Browser 基于 Flowmora Browser 二次开发，后者同样采用 MIT 许可证。
 
-## 🙏 Acknowledgments
+## 📧 反馈方式
 
-- Built with [Electron](https://www.electronjs.org/)
-- Based on [Flowmora Browser](https://github.com/piyushrajyadav/flowmora-browser)
-- Icons and design inspiration from modern browsers
-- Community feedback and contributions
+如有问题或建议，欢迎通过以下方式反馈：
+- **GitHub Issues**：在仓库中提交 Issue
+- **邮件**：联系核心维护者
+- **社区讨论**：参与项目相关讨论
 
 ---
 
 <p align="center">
-  Made with ❤️ for better browsing
+  Made with ❤️ 为科研与学习而生
 </p>

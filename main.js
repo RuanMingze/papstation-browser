@@ -1,6 +1,9 @@
 const { app, BrowserWindow, ipcMain, session, shell } = require('electron');
 const path = require('path');
 
+// Disable WebViewAllowPopupsWarning to allow popups
+app.commandLine.appendSwitch('disable-features', 'WebViewAllowPopupsWarning');
+
 if (require('electron-squirrel-startup')) app.quit();
 
 // Determine if we're in development mode
@@ -39,8 +42,8 @@ function createWindow() {
     // Load the index.html of the app
     mainWindow.loadFile('index.html');
 
-    // Open DevTools
-     mainWindow.webContents.openDevTools();
+    // Open DevTools (disabled)
+    // mainWindow.webContents.openDevTools();
 
     // Handle window closed
     mainWindow.on('closed', () => {
@@ -203,30 +206,138 @@ ipcMain.handle('clear-completed-downloads', () => {
 // ============================================
 // Window Control IPC Handlers
 // ============================================
-ipcMain.handle('window-minimize', () => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.minimize();
+ipcMain.handle('window-minimize', (event) => {
+    const window = event.sender.getOwnerBrowserWindow();
+    if (window && !window.isDestroyed()) {
+        window.minimize();
         return true;
     }
     return false;
 });
 
-ipcMain.handle('window-maximize', () => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-        if (mainWindow.isMaximized()) {
-            mainWindow.unmaximize();
+ipcMain.handle('window-maximize', (event) => {
+    const window = event.sender.getOwnerBrowserWindow();
+    if (window && !window.isDestroyed()) {
+        if (window.isMaximized()) {
+            window.unmaximize();
         } else {
-            mainWindow.maximize();
+            window.maximize();
         }
         return true;
     }
     return false;
 });
 
-ipcMain.handle('window-close', () => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.close();
+ipcMain.handle('window-close', (event) => {
+    // Get the window that sent the close request
+    const window = event.sender.getOwnerBrowserWindow();
+    if (window && !window.isDestroyed()) {
+        window.close();
         return true;
+    }
+    return false;
+});
+
+ipcMain.handle('webview-go-back', (event, webviewId) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        return mainWindow.webContents.executeJavaScript(`
+            const webview = document.getElementById('${webviewId}');
+            if (webview && webview.canGoBack()) {
+                webview.goBack();
+                return true;
+            }
+            return false;
+        `);
+    }
+    return false;
+});
+
+ipcMain.handle('webview-go-forward', (event, webviewId) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        return mainWindow.webContents.executeJavaScript(`
+            const webview = document.getElementById('${webviewId}');
+            if (webview && webview.canGoForward()) {
+                webview.goForward();
+                return true;
+            }
+            return false;
+        `);
+    }
+    return false;
+});
+
+ipcMain.handle('webview-save-page', async (event, webviewId) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        try {
+            // Get the HTML content and URL from the webview
+            const result = await mainWindow.webContents.executeJavaScript(`
+                (async function() {
+                    const webview = document.getElementById('${webviewId}');
+                    if (webview) {
+                        const html = await webview.executeJavaScript('document.documentElement.outerHTML');
+                        const url = webview.src;
+                        return { html, url };
+                    }
+                    return null;
+                })();
+            `);
+            
+            if (result && result.html && result.url) {
+                const { html, url } = result;
+                
+                // Generate a filename based on the URL or current timestamp
+                let filename = 'saved-page.html';
+                try {
+                    const urlObj = new URL(url);
+                    const pathname = urlObj.pathname;
+                    const lastSegment = pathname.split('/').pop();
+                    if (lastSegment && lastSegment.includes('.')) {
+                        filename = lastSegment;
+                    } else {
+                        const hostname = urlObj.hostname;
+                        filename = `${hostname.replace(/\./g, '-')}-${Date.now()}.html`;
+                    }
+                } catch (e) {
+                    // If URL parsing fails, use timestamp
+                    filename = `saved-page-${Date.now()}.html`;
+                }
+                
+                // Create a blob from the HTML content
+                const blob = new Blob([html], { type: 'text/html' });
+                
+                // Create a temporary URL for the blob
+                const blobUrl = URL.createObjectURL(blob);
+                
+                // Download the blob URL with a specific filename
+                mainWindow.webContents.downloadURL(blobUrl);
+                
+                // Listen for download start to set the filename
+                mainWindow.webContents.session.once('will-download', (event, item) => {
+                    item.setFilename(filename);
+                });
+                
+                // Revoke the blob URL after download
+                setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+                
+                return true;
+            }
+        } catch (error) {
+            console.error('Error saving page:', error);
+        }
+    }
+    return false;
+});
+
+ipcMain.handle('webview-open-devtools', (event, webviewId) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        return mainWindow.webContents.executeJavaScript(`
+            const webview = document.getElementById('${webviewId}');
+            if (webview) {
+                webview.openDevTools();
+                return true;
+            }
+            return false;
+        `);
     }
     return false;
 });
