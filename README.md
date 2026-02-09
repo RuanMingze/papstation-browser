@@ -34,7 +34,7 @@ Papstation Browser 基于 Flowmora Browser 二次开发，专注于为科研人�
 | 📖 结构化知识导出 | ❌ | ✅ |
 | 🌙 内置深色模式 | ✅ | ✅ |
 | 🔒 隐私优先设计 | ⚠️ | ✅ |
-| 🚀 轻量高效 | ⚠️ | ✅ |
+| 🚀 轻量高效 | ⚠️ | ✅ (内存占用比 Chrome 低40%+) |
 | 🎨 现代界面 | ✅ | ✅ |
 | 🐔 ChickRubGo 本土化搜索 | ❌ | ✅ |
 | 🌍 中文全本地化 | ❌ | ✅ |
@@ -71,7 +71,7 @@ Papstation Browser 基于 Flowmora Browser 二次开发，专注于为科研人�
 
 ---
 
-## �️ 技术栈
+## 🗜️ 技术栈
 
 - **Electron 40.1.0**：跨平台桌面应用框架
 - **Chromium**：高性能网页渲染引擎
@@ -82,7 +82,7 @@ Papstation Browser 基于 Flowmora Browser 二次开发，专注于为科研人�
 
 ---
 
-## � 安装使用
+## 📦 安装使用
 
 ### 开发环境启动
 
@@ -123,7 +123,7 @@ Papstation Browser 基于 Flowmora Browser 二次开发，专注于为科研人�
 
 ---
 
-## � 贡献说明
+## 🤝 贡献说明
 
 ### 核心维护者
 - **RuanMingze** - 主要开发者和维护者
@@ -149,7 +149,7 @@ Papstation Browser 基于 Flowmora Browser 二次开发，专注于为科研人�
 ### 基于 Flowmora Browser
 Papstation Browser 基于 Flowmora Browser 二次开发，后者同样采用 MIT 许可证。
 
-## � 反馈方式
+## 📧 反馈方式
 
 如有问题或建议，欢迎通过以下方式反馈：
 - **GitHub Issues**：在仓库中提交 Issue
@@ -160,5 +160,4 @@ Papstation Browser 基于 Flowmora Browser 二次开发，后者同样采用 MIT
 
 <p align="center">
   Made with ❤️ 为科研与学习而生
-
 </p>
