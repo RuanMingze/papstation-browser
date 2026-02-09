@@ -628,6 +628,35 @@ body {
   pointer-events: none;
 }
 
+.pwa-install-btn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+  margin-left: 4px;
+  -webkit-app-region: no-drag;
+  pointer-events: auto !important;
+  position: relative;
+  z-index: 50;
+}
+
+.pwa-install-btn:hover {
+  color: var(--success);
+}
+
+.pwa-install-btn svg {
+  width: 16px;
+  height: 16px;
+  pointer-events: none;
+}
+
 /* Nav Actions - Ensure Clickable */
 .nav-actions {
   display: flex;

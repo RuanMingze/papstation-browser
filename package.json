@@ -37,10 +37,16 @@
           "arch": [
             "x64"
           ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "icon": "assets/icon.png",
-      "artifactName": "${productName} Setup.${ext}"
+      "artifactName": "${productName}_Win64_${version}.${ext}"
     },
     "nsis": {
       "oneClick": false,

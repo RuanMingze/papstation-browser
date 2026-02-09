@@ -20,7 +20,6 @@ function loadSavedSettings() {
             return JSON.parse(saved);
         }
     } catch (e) {
-        console.error('Failed to load settings:', e);
     }
     return null;
 }
@@ -30,6 +29,13 @@ const savedSettings = loadSavedSettings();
 const CONFIG = {
     get homePage() {
         const settings = loadSavedSettings();
+        if (settings && settings.usePresetHomePage) {
+            const searchEngine = settings.searchEngine || 'bing';
+            return `./preset-home.html?searchEngine=${encodeURIComponent(searchEngine)}`;
+        }
+        if (settings && settings.homePage) {
+            return settings.homePage;
+        }
         if (settings && settings.searchEngine) {
             const engines = {
                 google: 'https://www.google.com',
@@ -73,6 +79,7 @@ class TabManager {
         this.tabs = new Map(); // tabId -> { webview, title, favicon, url }
         this.activeTabId = null;
         this.tabCounter = 0;
+        this.currentContextMenu = null;
 
         // DOM Elements
         this.tabsContainer = document.getElementById('tabsContainer');
@@ -88,6 +95,7 @@ class TabManager {
         this.homeBtn = document.getElementById('homeBtn');
         this.newTabBtn = document.getElementById('newTabBtn');
         this.bookmarkBtn = document.getElementById('bookmarkBtn');
+        this.pwaInstallBtn = document.getElementById('pwaInstallBtn');
 
         this.init();
     }
@@ -114,14 +122,19 @@ class TabManager {
         const tabElement = this.createTabElement(tabId);
         this.tabsContainer.appendChild(tabElement);
 
-        // Create webview
-        const webview = this.createWebview(tabId, url);
+        // Create webview and overlay
+        const { webview, overlay } = this.createWebview(tabId, url);
         this.webviewContainer.appendChild(webview);
+        // Only add overlay if it's not null
+        if (overlay) {
+            this.webviewContainer.appendChild(overlay);
+        }
 
         // Store tab data
         this.tabs.set(tabId, {
             element: tabElement,
             webview: webview,
+            overlay: overlay,
             title: CONFIG.defaultTitle,
             favicon: null,
             url: url,
@@ -199,10 +212,96 @@ class TabManager {
         // Hide by default
         webview.style.display = 'none';
 
-        return webview;
+        // Create transparent overlay for right-click handling
+        const overlay = document.createElement('div');
+        overlay.id = `overlay-${tabId}`;
+        overlay.className = 'webview-overlay';
+        overlay.style.cssText = `
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 100;
+        `;
+
+        // Add right-click event listener to overlay
+        overlay.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            console.log('Overlay context menu event triggered', e);
+            this.showWebviewContextMenu(e, tabId, webview);
+        });
+
+        // Make overlay capture right-clicks but pass through other events
+        overlay.style.pointerEvents = 'none';
+        
+        // Add a child element that captures only right-clicks
+        const rightClickCapture = document.createElement('div');
+        rightClickCapture.style.cssText = `
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: auto;
+        `;
+        
+        // Only handle right-click events, let all other events pass through
+        rightClickCapture.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('Right-click capture event triggered', e);
+            this.showWebviewContextMenu(e, tabId, webview);
+        });
+        
+        // Let all other mouse events pass through
+        rightClickCapture.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+        
+        rightClickCapture.addEventListener('mousedown', (e) => {
+            e.stopPropagation();
+        });
+        
+        rightClickCapture.addEventListener('mouseup', (e) => {
+            e.stopPropagation();
+        });
+        
+        rightClickCapture.addEventListener('mousemove', (e) => {
+            e.stopPropagation();
+        });
+        
+        // Remove the overlay entirely
+        // We'll handle right-click events directly through the webview's contextmenu event
+        return { webview, overlay: null };
     }
 
     setupWebviewListeners(tabId, webview) {
+        // Context menu - disabled
+        // webview.addEventListener('contextmenu', (e) => {
+        //     // Log all relevant event properties
+        //     console.log('Context menu event details:', {
+        //         shiftKey: e.shiftKey,
+        //         button: e.button,
+        //         buttons: e.buttons,
+        //         ctrlKey: e.ctrlKey,
+        //         altKey: e.altKey,
+        //         metaKey: e.metaKey,
+        //         type: e.type,
+        //         target: e.target ? e.target.tagName : null
+        //     });
+        //     
+        //     // Check if Shift key is pressed
+        //     if (e.shiftKey) {
+        //         console.log('Shift key is pressed!');
+        //         e.preventDefault();
+        //         this.showWebviewContextMenu(e, tabId, webview);
+        //     } else {
+        //         console.log('Shift key is NOT pressed, allowing default context menu');
+        //     }
+        // });
+
         // Page title updated
         webview.addEventListener('page-title-updated', (e) => {
             this.updateTabTitle(tabId, e.title);
@@ -235,15 +334,13 @@ class TabManager {
                 fetch(errorPagePath)
                     .then(response => {
                         if (response.ok) {
-                            // Show error page
-                            webview.src = errorPagePath;
+                            // Show error page in iframe
+                            this.showErrorInIframe(tabId, errorPagePath);
                         } else {
                             // If no specific error page, show generic error
-                            console.warn(`No error page for status code ${e.statusCode}`);
                         }
                     })
                     .catch(err => {
-                        console.error('Error checking error page:', err);
                     });
             }
         });
@@ -279,8 +376,8 @@ class TabManager {
                 const errorStatusMap = {
                     'ERR_NAME_NOT_RESOLVED': 404,      // DNS 解析失败
                     'ERR_CONNECTION_REFUSED': 502,     // 连接被拒绝
-                    'ERR_TIMED_OUT': 504,              // 连接超时
-                    'ERR_INTERNET_DISCONNECTED': 502,  // 网络断开
+                    'ERR_CONNECTION_TIMED_OUT': 504,   // 连接超时
+                    'ERR_INTERNET_DISCONNECTED': 503,  // 网络断开
                     'ERR_HTTP_RESPONSE_CODE_FAILURE': e.statusCode || 500, // 使用实际状态码
                     'ERR_CONNECTION_RESET': 502,       // 连接重置
                     'ERR_NETWORK_ACCESS_DENIED': 403,   // 网络访问被拒绝
@@ -293,16 +390,15 @@ class TabManager {
                 // Get status code from map or default to 500
                 const statusCode = errorStatusMap[e.errorDescription] || 500;
                 
-                // Show error page
+                // Show error page in iframe
                 const errorPagePath = `errors/${statusCode}.html`;
                 fetch(errorPagePath)
                     .then(response => {
                         if (response.ok) {
-                            webview.src = errorPagePath;
+                            this.showErrorInIframe(tabId, errorPagePath);
                         }
                     })
                     .catch(err => {
-                        console.error('Error loading error page:', err);
                     });
             }
         });
@@ -320,7 +416,6 @@ class TabManager {
                         const resolvedUrl = new URL(url, currentTab.url).href;
                         this.createTab(resolvedUrl);
                     } catch (err) {
-                        console.error('Error resolving relative URL:', err);
                         this.createTab(url);
                     }
                 } else {
@@ -342,12 +437,28 @@ class TabManager {
                     .catch(() => { });
             }
             
+            // Check for service worker and PWA capabilities
+            this.checkPwaCapabilities(tabId, webview);
+            
+            // Capture beforeinstallprompt event for PWA installation
+            webview.executeJavaScript(`
+                // Capture beforeinstallprompt event
+                window.addEventListener('beforeinstallprompt', (e) => {
+                    // Prevent Chrome 67 and earlier from automatically showing the prompt
+                    e.preventDefault();
+                    // Stash the event so it can be triggered later
+                    window.deferredPrompt = e;
+                });
+            `).catch(err => {
+            });
+            
             // Handle target="_blank" links to open in new tabs
             webview.executeJavaScript(`
                 // Override window.open to handle target="_blank"
                 const originalOpen = window.open;
                 window.open = function(url, target, features) {
                     if (target === '_blank' || !target) {
+                        // Open in new tab
                         console.log('OPEN_IN_NEW_TAB:' + url);
                         return {
                             focus: function() {},
@@ -360,7 +471,7 @@ class TabManager {
                 // Add click listener to all links with target="_blank"
                 document.addEventListener('click', (e) => {
                     const link = e.target.closest('a');
-                    if (link && link.target === '_blank' && link.href) {
+                    if (link && (link.target === '_blank' || link.getAttribute('rel') === 'noopener noreferrer') && link.href) {
                         e.preventDefault();
                         // Send message to open in new tab
                         console.log('OPEN_IN_NEW_TAB:' + link.href);
@@ -372,20 +483,17 @@ class TabManager {
                     mutations.forEach((mutation) => {
                         mutation.addedNodes.forEach((node) => {
                             if (node.nodeType === Node.ELEMENT_NODE) {
-                                if (node.tagName === 'A' && node.target === '_blank' && node.href) {
+                                if (node.tagName === 'A' && (node.target === '_blank' || node.getAttribute('rel') === 'noopener noreferrer') && node.href) {
                                     node.addEventListener('click', (e) => {
                                         e.preventDefault();
                                         console.log('OPEN_IN_NEW_TAB:' + node.href);
                                     });
                                 }
                                 // Check child nodes
-                                node.querySelectorAll('a[target="_blank"]').forEach((link) => {
+                                node.querySelectorAll('a[target="_blank"], a[rel*="noopener"]').forEach((link) => {
                                     link.addEventListener('click', (e) => {
                                         e.preventDefault();
-                                        window.postMessage({ 
-                                            type: 'OPEN_IN_NEW_TAB', 
-                                            url: link.href 
-                                        });
+                                        console.log('OPEN_IN_NEW_TAB:' + link.href);
                                     });
                                 });
                             }
@@ -398,7 +506,6 @@ class TabManager {
                     subtree: true
                 });
             `).catch(err => {
-                console.error('Error setting up target="_blank" handler:', err);
             });
         });
 
@@ -416,7 +523,6 @@ class TabManager {
                                 const resolvedUrl = new URL(url, currentTab.url).href;
                                 this.createTab(resolvedUrl);
                             } catch (err) {
-                                console.error('Error resolving relative URL:', err);
                                 this.createTab(url);
                             }
                         } else {
@@ -440,13 +546,27 @@ class TabManager {
             if (currentTab) {
                 currentTab.element.classList.remove('active');
                 currentTab.webview.style.display = 'none';
+                if (currentTab.overlay) {
+                    currentTab.overlay.style.display = 'none';
+                }
+                if (currentTab.errorIframe) {
+                    currentTab.errorIframe.style.display = 'none';
+                }
             }
         }
 
         // Activate new tab
         this.activeTabId = tabId;
         tab.element.classList.add('active');
-        tab.webview.style.display = 'flex';
+        if (tab.errorIframe) {
+            tab.errorIframe.style.display = 'block';
+            tab.webview.style.display = 'none';
+        } else {
+            tab.webview.style.display = 'flex';
+        }
+        if (tab.overlay) {
+            tab.overlay.style.display = 'block';
+        }
 
         // Update URL bar
         this.updateUrlBar(tab.url);
@@ -455,6 +575,12 @@ class TabManager {
 
         // Hide new tab page if showing webview
         this.toggleNewTabPage(tab.url === 'about:blank' || !tab.url);
+        
+        // Check PWA capabilities for the new active tab (safely)
+        try {
+            this.checkPwaCapabilities(tabId, tab.webview);
+        } catch (err) {
+        }
     }
 
     closeTab(tabId) {
@@ -476,12 +602,67 @@ class TabManager {
         // Remove tab
         tab.element.remove();
         tab.webview.remove();
+        if (tab.overlay) {
+            tab.overlay.remove();
+        }
+        if (tab.errorIframe) {
+            tab.errorIframe.remove();
+        }
         this.tabs.delete(tabId);
 
         // Activate next tab if this was active
         if (this.activeTabId === tabId) {
             this.activateTab(nextTabId);
         }
+    }
+
+    showErrorInIframe(tabId, errorPagePath) {
+        const tab = this.tabs.get(tabId);
+        if (!tab) return;
+
+        // Remove any existing error iframe
+        if (tab.errorIframe) {
+            tab.errorIframe.remove();
+        }
+
+        // Create error iframe
+        const iframe = document.createElement('iframe');
+        iframe.id = `error-iframe-${tabId}`;
+        iframe.className = 'error-iframe';
+        iframe.src = errorPagePath;
+        iframe.style.cssText = `
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: none;
+            z-index: 1000;
+        `;
+
+        // Add iframe to webview container
+        this.webviewContainer.appendChild(iframe);
+
+        // Store reference to iframe in tab data
+        tab.errorIframe = iframe;
+
+        // Hide webview
+        tab.webview.style.display = 'none';
+
+        // Show iframe
+        iframe.style.display = 'block';
+    }
+
+    hideErrorIframe(tabId) {
+        const tab = this.tabs.get(tabId);
+        if (!tab || !tab.errorIframe) return;
+
+        // Remove error iframe
+        tab.errorIframe.remove();
+        tab.errorIframe = null;
+
+        // Show webview again
+        tab.webview.style.display = 'flex';
     }
 
     updateTabTitle(tabId, title) {
@@ -514,30 +695,15 @@ class TabManager {
     navigate(input) {
         let url = input.trim();
         
-        // Handle relative paths
-        if (url && !url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('file://') && !url.startsWith('about:')) {
-            // Get current tab's URL to resolve relative path
-            const currentTab = this.tabs.get(this.activeTabId);
-            if (currentTab && currentTab.url) {
-                try {
-                    url = new URL(url, currentTab.url).href;
-                } catch (err) {
-                    console.error('Error resolving relative URL:', err);
-                    // If error, use normalizeUrl as fallback
-                    url = this.normalizeUrl(input);
-                }
-            } else {
-                // If no current tab, use normalizeUrl
-                url = this.normalizeUrl(input);
-            }
-        } else {
-            // For absolute URLs or other cases, use normalizeUrl
-            url = this.normalizeUrl(input);
-        }
+        // Use normalizeUrl directly to handle all cases correctly
+        url = this.normalizeUrl(input);
         
         const tab = this.tabs.get(this.activeTabId);
 
         if (tab && tab.webview) {
+            // Hide any existing error iframe
+            this.hideErrorIframe(this.activeTabId);
+            
             tab.webview.src = url;
             tab.url = url;
             this.toggleNewTabPage(false);
@@ -551,6 +717,12 @@ class TabManager {
 
         // Check if it's already a valid URL
         if (/^https?:\/\//i.test(input)) {
+            return input;
+        }
+
+        // Check if it's a local file path
+        if (input.startsWith('./') || input.startsWith('../') || input.includes('.html') || input.includes('.htm')) {
+            // Return as is for local files
             return input;
         }
 
@@ -595,6 +767,244 @@ class TabManager {
         if (tab && tab.webview) {
             tab.webview.reload();
         }
+    }
+
+    openDevTools() {
+        const tab = this.tabs.get(this.activeTabId);
+        if (tab && tab.webview) {
+            tab.webview.openDevTools();
+        }
+    }
+
+    checkPwaCapabilities(tabId, webview) {
+        if (!webview) return;
+
+        try {
+            // Check if page has service worker and is installable
+            webview.executeJavaScript(`
+            (async function() {
+                // Check if service worker is registered
+                const registrations = await navigator.serviceWorker.getRegistrations();
+                const hasServiceWorker = registrations.length > 0;
+                
+                // Check if PWA is installable
+                let isInstallable = false;
+                try {
+                    // Check for manifest
+                    const manifestLink = document.querySelector('link[rel="manifest"]');
+                    if (manifestLink) {
+                        isInstallable = true;
+                    }
+                } catch (e) {
+                }
+                
+                return { hasServiceWorker, isInstallable };
+            })();
+        `).then(result => {
+            if (result && result.hasServiceWorker && result.isInstallable) {
+                // Show PWA install button if this is the active tab
+                if (tabId === this.activeTabId && this.pwaInstallBtn) {
+                    this.pwaInstallBtn.style.display = 'flex';
+                    
+                    // Add click event listener for PWA install
+                    this.pwaInstallBtn.onclick = () => {
+                        this.installPWA(tabId, webview);
+                    };
+                }
+            } else {
+                // Hide PWA install button
+                if (this.pwaInstallBtn) {
+                    this.pwaInstallBtn.style.display = 'none';
+                }
+            }
+        }).catch(err => {
+            // Hide button on error
+            if (this.pwaInstallBtn) {
+                this.pwaInstallBtn.style.display = 'none';
+            }
+        });
+    } catch (err) {
+        // Hide button on error
+        if (this.pwaInstallBtn) {
+            this.pwaInstallBtn.style.display = 'none';
+        }
+    }
+    }
+
+    installPWA(tabId, webview) {
+        if (!webview) return;
+
+        // Trigger PWA installation
+        webview.executeJavaScript(`
+            (async function() {
+                // Check if beforeinstallprompt event is available
+                if (window.deferredPrompt) {
+                    // Show installation prompt
+                    window.deferredPrompt.prompt();
+                    
+                    // Wait for user to respond
+                    const choiceResult = await window.deferredPrompt.userChoice;
+                    // Clear the deferred prompt
+                    window.deferredPrompt = null;
+                    return choiceResult.outcome === 'accepted';
+                } else {
+                    return false;
+                }
+            })();
+        `).then(installed => {
+            if (installed) {
+                this.setStatus('PWA 安装成功！');
+            } else {
+                this.setStatus('PWA 安装已取消');
+            }
+        }).catch(err => {
+            this.setStatus('PWA 安装失败');
+        });
+    }
+
+    showWebviewContextMenu(e, tabId, webview) {
+        console.log('showWebviewContextMenu called', { tabId, webviewId: webview.id });
+        const tab = this.tabs.get(tabId);
+        if (!tab) {
+            console.log('Tab not found for tabId:', tabId);
+            return;
+        }
+        console.log('Tab found:', tab);
+        
+        // Close any existing context menu
+        if (this.currentContextMenu) {
+            try {
+                if (this.currentContextMenu.parentNode) {
+                    document.body.removeChild(this.currentContextMenu);
+                    console.log('Closed existing context menu');
+                }
+            } catch (error) {
+                console.error('Error closing existing context menu:', error);
+            }
+            this.currentContextMenu = null;
+        }
+
+        // Get mouse position - handle different event structures
+        const x = e.x || e.clientX || e.pageX || 0;
+        const y = e.y || e.clientY || e.pageY || 0;
+
+        const canGoBack = webview.canGoBack();
+        const canGoForward = webview.canGoForward();
+
+        const menu = document.createElement('div');
+        menu.className = 'webview-context-menu';
+        menu.style.cssText = `
+            position: fixed;
+            left: ${x}px;
+            top: ${y}px;
+            background: #1a1a2e;
+            border: 1px solid #333;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            padding: 4px 0;
+            min-width: 180px;
+            z-index: 10000;
+        `;
+
+        const items = [
+            {
+                label: '返回',
+                enabled: canGoBack,
+                action: () => {
+                    window.focusFlowAPI.webview.goBack(webview.id);
+                }
+            },
+            {
+                label: '前进',
+                enabled: canGoForward,
+                action: () => {
+                    window.focusFlowAPI.webview.goForward(webview.id);
+                }
+            },
+            { divider: true },
+            {
+                label: '另存为...',
+                enabled: true,
+                action: () => {
+                    window.focusFlowAPI.webview.savePage(webview.id);
+                }
+            },
+            { divider: true },
+            {
+                label: '检查',
+                enabled: true,
+                action: () => {
+                    webview.openDevTools();
+                }
+            }
+        ];
+
+        items.forEach(item => {
+            if (item.divider) {
+                const divider = document.createElement('div');
+                divider.style.cssText = `
+                    height: 1px;
+                    background: #333;
+                    margin: 4px 0;
+                `;
+                menu.appendChild(divider);
+            } else {
+                const menuItem = document.createElement('div');
+                menuItem.className = 'context-menu-item';
+                menuItem.textContent = item.label;
+                menuItem.style.cssText = `
+                    padding: 8px 16px;
+                    cursor: ${item.enabled ? 'pointer' : 'not-allowed'};
+                    color: ${item.enabled ? '#fff' : '#666'};
+                    font-size: 13px;
+                    transition: background 0.15s;
+                `;
+
+                if (item.enabled) {
+                    menuItem.addEventListener('mouseenter', () => {
+                        menuItem.style.background = '#2a2a4e';
+                    });
+                    menuItem.addEventListener('mouseleave', () => {
+                        menuItem.style.background = 'transparent';
+                    });
+                    menuItem.addEventListener('click', () => {
+                        item.action();
+                        document.body.removeChild(menu);
+                    });
+                }
+
+                menu.appendChild(menuItem);
+            }
+        });
+
+        console.log('Creating context menu at position:', { x, y });
+        console.log('Menu created:', menu);
+        
+        document.body.appendChild(menu);
+        this.currentContextMenu = menu;
+        console.log('Menu added to document');
+        console.log('Current context menu set:', this.currentContextMenu);
+
+        const closeMenu = () => {
+            try {
+                if (menu.parentNode) {
+                    document.body.removeChild(menu);
+                    console.log('Menu removed from document');
+                }
+                // Clear the current context menu reference
+                if (this.currentContextMenu === menu) {
+                    this.currentContextMenu = null;
+                    console.log('Current context menu cleared');
+                }
+            } catch (error) {
+                console.error('Error closing context menu:', error);
+            }
+        };
+
+        setTimeout(() => {
+            document.addEventListener('click', closeMenu, { once: true });
+            console.log('Click listener added to close menu');
+        }, 0);
     }
 
     goHome() {
@@ -708,6 +1118,11 @@ class TabManager {
                     }
                 }
             }
+            // F12: Open DevTools for current webview
+            if (e.key === 'F12') {
+                e.preventDefault();
+                this.openDevTools();
+            }
         });
     }
 
@@ -803,32 +1218,11 @@ class TabManager {
             .then(pageContent => {
                 if (pageContent && pageContent.url) {
                     // Log the extracted content for testing
-                    console.log('📚 [Knowledge Mode] Page content extracted:');
-                    console.log('━'.repeat(50));
-                    console.log('🔗 URL:', pageContent.url);
-                    console.log('📄 Title:', pageContent.title);
-                    console.log('📌 H1 Headings:', pageContent.headings);
-                    console.log('📎 H2 SubHeadings:', pageContent.subHeadings);
-                    console.log('📝 Paragraphs:', pageContent.paragraphs.length, 'found');
-                    console.log('📋 List Items:', pageContent.lists.length, 'found');
-                    console.log('⏰ Timestamp:', pageContent.timestamp);
-                    console.log('━'.repeat(50));
-
                     // Classify the content using the Knowledge Classifier
                     if (window.knowledgeClassifier) {
                         const classifiedContent = window.knowledgeClassifier.classify(pageContent);
 
                         if (classifiedContent) {
-                            console.log('');
-                            console.log('🧠 [Knowledge Classifier] Content classified:');
-                            console.log('═'.repeat(50));
-                            console.log('📚 Subject:', classifiedContent.subject);
-                            console.log('📖 Topic:', classifiedContent.topic);
-                            console.log('📑 Chapter:', classifiedContent.chapter);
-                            console.log('🔑 Key Points:', classifiedContent.keyPoints);
-                            console.log('═'.repeat(50));
-                            console.log('📦 Full classified object:', classifiedContent);
-
                             // Dispatch event with classified content
                             window.dispatchEvent(new CustomEvent('pageContentClassified', {
                                 detail: { tabId, content: classifiedContent }
@@ -843,7 +1237,6 @@ class TabManager {
                 }
             })
             .catch(err => {
-                console.warn('Knowledge Mode: Failed to extract content from page:', err.message);
             });
     }
 }
@@ -854,7 +1247,6 @@ class TabManager {
 class ThemeManager {
     constructor() {
         this.themeToggle = document.getElementById('themeToggle');
-        console.log('ThemeManager: themeToggle element:', this.themeToggle);
         this.init();
     }
 
@@ -866,23 +1258,18 @@ class ThemeManager {
         // Toggle listener
         if (this.themeToggle) {
             this.themeToggle.addEventListener('click', (e) => {
-                console.log('Theme toggle clicked!');
                 e.stopPropagation();
                 const currentTheme = document.documentElement.getAttribute('data-theme');
                 const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-                console.log('Switching theme from', currentTheme, 'to', newTheme);
                 this.setTheme(newTheme);
             });
-            console.log('ThemeManager: click listener attached');
         } else {
-            console.error('ThemeManager: themeToggle not found!');
         }
     }
 
     setTheme(theme) {
         document.documentElement.setAttribute('data-theme', theme);
         localStorage.setItem('focusflow-theme', theme);
-        console.log('Theme set to:', theme);
     }
 
     toggleTheme() {
@@ -921,9 +1308,7 @@ class KnowledgeManager {
                 e.stopPropagation();
                 this.toggle();
             });
-            console.log('KnowledgeManager: click listener attached');
         } else {
-            console.error('KnowledgeManager: knowledgeToggle button not found!');
         }
     }
 
@@ -933,7 +1318,6 @@ class KnowledgeManager {
             // Default to false (OFF) if not set
             return saved === 'true';
         } catch (e) {
-            console.error('Failed to load knowledge mode state:', e);
             return false;
         }
     }
@@ -942,7 +1326,6 @@ class KnowledgeManager {
         try {
             localStorage.setItem(this.storageKey, this.isEnabled.toString());
         } catch (e) {
-            console.error('Failed to save knowledge mode state:', e);
         }
     }
 
@@ -960,8 +1343,6 @@ class KnowledgeManager {
         }
 
         // Log state change for debugging
-        console.log(`Knowledge Mode: ${this.isEnabled ? 'ON' : 'OFF'}`);
-
         // Dispatch custom event for other parts of the app to listen to
         window.dispatchEvent(new CustomEvent('knowledgeModeChanged', {
             detail: { enabled: this.isEnabled }
@@ -1785,19 +2166,16 @@ class KnowledgeDB {
             const request = indexedDB.open(this.dbName, this.dbVersion);
 
             request.onerror = (event) => {
-                console.error('KnowledgeDB: Failed to open database:', event.target.error);
                 reject(event.target.error);
             };
 
             request.onsuccess = (event) => {
                 this.db = event.target.result;
                 this.isReady = true;
-                console.log('✓ KnowledgeDB: Database opened successfully');
                 resolve(this.db);
             };
 
             request.onupgradeneeded = (event) => {
-                console.log('KnowledgeDB: Upgrading database schema...');
                 const db = event.target.result;
 
                 // Create the knowledge object store if it doesn't exist
@@ -1814,8 +2192,6 @@ class KnowledgeDB {
                     store.createIndex('url', 'url', { unique: false });
                     store.createIndex('timestamp', 'timestamp', { unique: false });
                     store.createIndex('subject_topic', ['subject', 'topic'], { unique: false });
-
-                    console.log('✓ KnowledgeDB: Object store and indexes created');
                 }
             };
         });
@@ -1859,12 +2235,10 @@ class KnowledgeDB {
 
             request.onsuccess = (event) => {
                 const id = event.target.result;
-                console.log(`✓ KnowledgeDB: Entry saved with ID ${id}`);
                 resolve({ ...knowledgeEntry, id });
             };
 
             request.onerror = (event) => {
-                console.error('KnowledgeDB: Failed to save entry:', event.target.error);
                 reject(event.target.error);
             };
         });
@@ -1881,12 +2255,10 @@ class KnowledgeDB {
 
             request.onsuccess = (event) => {
                 const entries = event.target.result;
-                console.log(`KnowledgeDB: Retrieved ${entries.length} entries`);
                 resolve(entries);
             };
 
             request.onerror = (event) => {
-                console.error('KnowledgeDB: Failed to get all entries:', event.target.error);
                 reject(event.target.error);
             };
         });
@@ -1904,12 +2276,10 @@ class KnowledgeDB {
 
             request.onsuccess = (event) => {
                 const entries = event.target.result;
-                console.log(`KnowledgeDB: Found ${entries.length} entries for subject "${subject}"`);
                 resolve(entries);
             };
 
             request.onerror = (event) => {
-                console.error('KnowledgeDB: Failed to get entries by subject:', event.target.error);
                 reject(event.target.error);
             };
         });
@@ -1927,12 +2297,10 @@ class KnowledgeDB {
 
             request.onsuccess = (event) => {
                 const entries = event.target.result;
-                console.log(`KnowledgeDB: Found ${entries.length} entries for topic "${topic}"`);
                 resolve(entries);
             };
 
             request.onerror = (event) => {
-                console.error('KnowledgeDB: Failed to get entries by topic:', event.target.error);
                 reject(event.target.error);
             };
         });
@@ -1950,12 +2318,10 @@ class KnowledgeDB {
 
             request.onsuccess = (event) => {
                 const entries = event.target.result;
-                console.log(`KnowledgeDB: Found ${entries.length} entries for chapter "${chapter}"`);
                 resolve(entries);
             };
 
             request.onerror = (event) => {
-                console.error('KnowledgeDB: Failed to get entries by chapter:', event.target.error);
                 reject(event.target.error);
             };
         });
@@ -1975,7 +2341,6 @@ class KnowledgeDB {
             };
 
             request.onerror = (event) => {
-                console.error('KnowledgeDB: Failed to get entry by ID:', event.target.error);
                 reject(event.target.error);
             };
         });
@@ -1991,12 +2356,10 @@ class KnowledgeDB {
             const request = store.delete(id);
 
             request.onsuccess = () => {
-                console.log(`✓ KnowledgeDB: Entry ${id} deleted`);
                 resolve(true);
             };
 
             request.onerror = (event) => {
-                console.error('KnowledgeDB: Failed to delete entry:', event.target.error);
                 reject(event.target.error);
             };
         });
@@ -2012,12 +2375,10 @@ class KnowledgeDB {
             const request = store.clear();
 
             request.onsuccess = () => {
-                console.log('✓ KnowledgeDB: All entries cleared');
                 resolve(true);
             };
 
             request.onerror = (event) => {
-                console.error('KnowledgeDB: Failed to clear entries:', event.target.error);
                 reject(event.target.error);
             };
         });
@@ -2219,8 +2580,6 @@ class KnowledgePanelManager {
                 this.close();
             }
         });
-
-        console.log('✓ KnowledgePanelManager initialized');
     }
 
     async open() {
@@ -2283,7 +2642,6 @@ class KnowledgePanelManager {
                 this.renderTopicsGrid();
             }
         } catch (err) {
-            console.error('KnowledgePanelManager: Failed to load data:', err);
         }
     }
 
@@ -2523,7 +2881,6 @@ class KnowledgePanelManager {
             this.showView('detail');
             this.renderDetailContent(entry);
         } catch (err) {
-            console.error('Failed to load entry:', err);
         }
     }
 
@@ -2578,7 +2935,6 @@ class KnowledgePanelManager {
             await this.loadData();
             this.navigateBack();
         } catch (err) {
-            console.error('Failed to delete entry:', err);
         }
     }
 
@@ -2684,7 +3040,6 @@ class KnowledgePanelManager {
                 this.renderTopicsGrid();
             }
         } catch (err) {
-            console.error('Search failed:', err);
         }
     }
 
@@ -2739,7 +3094,6 @@ class KnowledgeBookExporter {
         if (this.exportBtn) {
             this.exportBtn.addEventListener('click', () => this.exportBook());
         }
-        console.log('✓ KnowledgeBookExporter initialized');
     }
 
     async exportBook() {
@@ -2773,7 +3127,6 @@ class KnowledgeBookExporter {
             await this.downloadAsPDF(htmlContent);
 
         } catch (err) {
-            console.error('Export failed:', err);
             alert('导出失败：' + err.message);
         } finally {
             // Re-enable button
@@ -3264,7 +3617,6 @@ class BookmarkManager {
             const stored = localStorage.getItem(this.storageKey);
             this.bookmarks = stored ? JSON.parse(stored) : this.getDefaultBookmarks();
         } catch (e) {
-            console.error('Failed to load bookmarks:', e);
             this.bookmarks = this.getDefaultBookmarks();
         }
     }
@@ -3274,7 +3626,6 @@ class BookmarkManager {
             const stored = localStorage.getItem(this.foldersKey);
             this.folders = stored ? JSON.parse(stored) : [];
         } catch (e) {
-            console.error('Failed to load folders:', e);
             this.folders = [];
         }
     }
@@ -3283,7 +3634,6 @@ class BookmarkManager {
         try {
             localStorage.setItem(this.storageKey, JSON.stringify(this.bookmarks));
         } catch (e) {
-            console.error('Failed to save bookmarks:', e);
         }
     }
 
@@ -3291,7 +3641,6 @@ class BookmarkManager {
         try {
             localStorage.setItem(this.foldersKey, JSON.stringify(this.folders));
         } catch (e) {
-            console.error('Failed to save folders:', e);
         }
     }
 
@@ -3464,7 +3813,6 @@ class BookmarkManager {
 
         // Click to open
         el.addEventListener('click', (e) => {
-            console.log('Bookmark item clicked! URL:', bookmark.url);
             e.preventDefault();
             e.stopPropagation();
             this.tabManager.navigate(bookmark.url);
@@ -3660,6 +4008,12 @@ class BookmarkManager {
     updateStarButton() {
         if (!this.bookmarkBtn) return;
 
+        // Check if tabManager and tabs exist
+        if (!this.tabManager || !this.tabManager.tabs) {
+            this.bookmarkBtn.classList.remove('bookmarked');
+            return;
+        }
+
         const tab = this.tabManager.tabs.get(this.tabManager.activeTabId);
         if (tab && tab.url && tab.url !== 'about:blank') {
             const isBookmarked = this.isBookmarked(tab.url);
@@ -3671,19 +4025,13 @@ class BookmarkManager {
 
     toggleCurrentPage() {
         const tab = this.tabManager.tabs.get(this.tabManager.activeTabId);
-        console.log('toggleCurrentPage called, tab:', tab);
-        console.log('Active tab URL:', tab?.url);
-
         if (!tab || !tab.url || tab.url === 'about:blank') {
-            console.log('Cannot bookmark: no valid URL');
             return;
         }
 
         if (this.isBookmarked(tab.url)) {
-            console.log('Removing bookmark for:', tab.url);
             this.removeBookmark(tab.url);
         } else {
-            console.log('Adding bookmark for:', tab.url, tab.title);
             this.addBookmark(tab.url, tab.title, tab.favicon);
         }
         this.updateStarButton();
@@ -3695,31 +4043,22 @@ class BookmarkManager {
     // ============================================
 
     setupEventListeners() {
-        console.log('BookmarkManager: bookmarkBtn element:', this.bookmarkBtn);
-        console.log('BookmarkManager: allBookmarksBtn element:', this.allBookmarksBtn);
-
         // Star button click
         if (this.bookmarkBtn) {
             this.bookmarkBtn.addEventListener('click', (e) => {
-                console.log('Bookmark star button clicked!');
                 e.stopPropagation();
                 this.toggleCurrentPage();
             });
-            console.log('BookmarkManager: click listener attached to bookmarkBtn');
         } else {
-            console.error('BookmarkManager: bookmarkBtn not found!');
         }
 
         // All bookmarks button
         if (this.allBookmarksBtn) {
             this.allBookmarksBtn.addEventListener('click', (e) => {
-                console.log('All bookmarks button clicked!');
                 e.stopPropagation();
                 this.showAllBookmarksMenu(e);
             });
-            console.log('BookmarkManager: click listener attached to allBookmarksBtn');
         } else {
-            console.error('BookmarkManager: allBookmarksBtn not found!');
         }
 
         // Close menus on escape
@@ -3831,7 +4170,6 @@ class HistoryManager {
             const stored = localStorage.getItem(this.storageKey);
             this.history = stored ? JSON.parse(stored) : [];
         } catch (e) {
-            console.error('Failed to load history:', e);
             this.history = [];
         }
     }
@@ -3844,7 +4182,6 @@ class HistoryManager {
             }
             localStorage.setItem(this.storageKey, JSON.stringify(this.history));
         } catch (e) {
-            console.error('Failed to save history:', e);
         }
     }
 
@@ -3853,7 +4190,6 @@ class HistoryManager {
             const stored = localStorage.getItem(this.closedTabsKey);
             this.recentlyClosed = stored ? JSON.parse(stored) : [];
         } catch (e) {
-            console.error('Failed to load closed tabs:', e);
             this.recentlyClosed = [];
         }
     }
@@ -3865,7 +4201,6 @@ class HistoryManager {
             }
             localStorage.setItem(this.closedTabsKey, JSON.stringify(this.recentlyClosed));
         } catch (e) {
-            console.error('Failed to save closed tabs:', e);
         }
     }
 
@@ -4284,6 +4619,7 @@ class DownloadManager {
         this.downloads = new Map();
         this.isPanelOpen = false;
         this.notificationTimeout = null;
+        this.ipcListenersSetUp = false;
 
         this.init();
     }
@@ -4292,7 +4628,10 @@ class DownloadManager {
         this.createDownloadPanel();
         this.createNotificationPopup();
         this.setupEventListeners();
-        this.setupIPCListeners();
+        if (!this.ipcListenersSetUp) {
+            this.setupIPCListeners();
+            this.ipcListenersSetUp = true;
+        }
     }
 
     // ============================================
@@ -4301,7 +4640,6 @@ class DownloadManager {
 
     setupIPCListeners() {
         if (!window.focusFlowAPI || !window.focusFlowAPI.downloads) {
-            console.warn('Download API not available');
             return;
         }
 
@@ -4330,6 +4668,13 @@ class DownloadManager {
     // ============================================
 
     addDownload(data) {
+        // Check if download with the same filename and URL already exists
+        const existingDownload = Array.from(this.downloads.values()).find(
+            download => download.filename === data.filename && download.url === data.url
+        );
+        if (existingDownload) {
+            return;
+        }
         this.downloads.set(data.id, {
             id: data.id,
             filename: data.filename,
@@ -4759,87 +5104,54 @@ class MainMenuManager {
     setupEventListeners() {
         const menuBtn = document.getElementById('menuBtn');
         const menu = document.getElementById('mainMenu');
-        console.log('MainMenuManager: menuBtn element:', menuBtn);
-        console.log('MainMenuManager: menu element:', menu);
-
         if (menuBtn) {
             menuBtn.addEventListener('click', (e) => {
-                console.log('Menu button clicked!');
                 e.stopPropagation();
                 this.toggleMenu();
             });
-            console.log('MainMenuManager: click listener attached to menuBtn');
         } else {
-            console.error('MainMenuManager: menuBtn not found!');
         }
 
         // Use event delegation on the menu container for better reliability
         if (menu) {
-            console.log('MainMenuManager: Setting up event delegation on menu');
             menu.addEventListener('click', (e) => {
-                console.log('Menu container received click! Target:', e.target);
-                console.log('Target tagName:', e.target.tagName);
-                console.log('Target className:', e.target.className);
-                console.log('Target id:', e.target.id);
-
                 // Find the clicked menu item
                 const menuItem = e.target.closest('.main-menu-item');
-                console.log('Closest .main-menu-item found:', menuItem);
-
                 if (!menuItem) {
-                    console.log('No menu item found, returning');
                     return;
                 }
-
-                console.log('Menu item clicked:', menuItem.id);
                 e.stopPropagation();
 
                 const itemId = menuItem.id;
-                console.log('Processing itemId:', itemId);
-
                 if (itemId === 'menuNewIncognito') {
-                    console.log('Opening incognito window...');
                     this.openIncognitoWindow();
                 } else if (itemId === 'menuHistory') {
-                    console.log('Opening history panel...');
-                    console.log('window.historyManager =', window.historyManager);
                     if (window.historyManager) {
                         try {
                             window.historyManager.togglePanel();
-                            console.log('togglePanel called successfully');
                         } catch (err) {
-                            console.error('Error calling togglePanel:', err);
                         }
                     } else {
-                        console.error('historyManager not found!');
                         alert('历史记录不可用 - historyManager 未初始化');
                     }
                 } else if (itemId === 'menuKnowledge') {
-                    console.log('Opening knowledge panel...');
                     if (window.knowledgePanelManager) {
                         window.knowledgePanelManager.open();
                     }
                 } else if (itemId === 'menuDownloads') {
-                    console.log('Opening downloads panel...');
                     if (window.downloadManager) {
                         window.downloadManager.togglePanel();
                     }
                 } else if (itemId === 'menuSettings') {
-                    console.log('Opening settings panel...');
-                    console.log('window.settingsManager =', window.settingsManager);
                     if (window.settingsManager) {
                         try {
                             window.settingsManager.togglePanel();
-                            console.log('togglePanel called successfully');
                         } catch (err) {
-                            console.error('Error calling togglePanel:', err);
                         }
                     } else {
-                        console.error('settingsManager not found!');
                         alert('设置不可用 - settingsManager 未初始化');
                     }
                 } else if (itemId === 'menuSummarize') {
-                    console.log('Summarize page clicked from menu...');
                     // Check if Knowledge Mode is ON
                     if (!window.knowledgeManager || !window.knowledgeManager.isKnowledgeModeEnabled()) {
                         alert('请启用知识模式以进行总结。');
@@ -4878,7 +5190,6 @@ class MainMenuManager {
                                     }
                                 })
                                 .catch(err => {
-                                    console.error('Failed to summarize:', err);
                                     alert('无法从此页面提取内容。');
                                 });
                         } else {
@@ -4886,7 +5197,6 @@ class MainMenuManager {
                         }
                     }
                 } else if (itemId === 'menuExportPDF') {
-                    console.log('Export PDF clicked from menu...');
                     if (window.knowledgeBookExporter) {
                         window.knowledgeBookExporter.exportBook();
                     } else if (window.knowledgeDB) {
@@ -4901,14 +5211,12 @@ class MainMenuManager {
                         alert('知识系统未就绪。');
                     }
                 } else if (itemId === 'menuDevTools') {
-                    console.log('Opening DevTools for active tab...');
                     if (window.tabManager) {
                         const activeTab = window.tabManager.tabs.get(window.tabManager.activeTabId);
                         if (activeTab && activeTab.webview) {
                             try {
                                 activeTab.webview.openDevTools();
                             } catch (err) {
-                                console.error('Error opening DevTools:', err);
                                 alert('无法打开开发者工具：' + err.message);
                             }
                         } else {
@@ -4918,15 +5226,10 @@ class MainMenuManager {
                         alert('标签管理器未初始化。');
                     }
                 } else {
-                    console.log('Unknown itemId:', itemId);
                 }
-
-                console.log('Closing menu...');
                 this.toggleMenu(false);
             });
-            console.log('MainMenuManager: click listener attached to menu container');
         } else {
-            console.error('MainMenuManager: menu not found!');
         }
 
         // Close on outside click
@@ -5218,39 +5521,41 @@ class SettingsManager {
         this.activeSection = 'search';
 
         // Default settings
-        this.defaults = {
-            // Search Engine
-            searchEngine: 'chickrubgo',
-            // Startup
-            startupMode: 'newTab',
-            customStartupUrl: '',
-            // Privacy
-            disableHistoryTracking: false,
-            // Downloads
-            askBeforeDownload: true,
-            downloadPath: '',
-            // Appearance
-            theme: 'dark',
-            zoomLevel: 100,
-            fontSize: 14,
-            // Performance
-            lowMemoryMode: false,
-            hardwareAcceleration: true,
-            // Security
-            blockPopups: true,
-            blockThirdPartyCookies: false,
-            doNotTrack: false,
-            httpsOnly: false,
-            // Shortcuts
-            shortcuts: {
-                newTab: 'Ctrl+T',
-                closeTab: 'Ctrl+W',
-                reload: 'Ctrl+R',
-                history: 'Ctrl+H',
-                bookmarks: 'Ctrl+B',
-                commandPalette: 'Ctrl+K'
-            }
-        };
+            this.defaults = {
+                // Search Engine
+                searchEngine: 'chickrubgo',
+                // Startup
+                startupMode: 'newTab',
+                customStartupUrl: '',
+                homePage: '',
+                usePresetHomePage: false,
+                // Privacy
+                disableHistoryTracking: false,
+                // Downloads
+                askBeforeDownload: true,
+                downloadPath: '',
+                // Appearance
+                theme: 'dark',
+                zoomLevel: 100,
+                fontSize: 14,
+                // Performance
+                lowMemoryMode: false,
+                hardwareAcceleration: true,
+                // Security
+                blockPopups: true,
+                blockThirdPartyCookies: false,
+                doNotTrack: false,
+                httpsOnly: false,
+                // Shortcuts
+                shortcuts: {
+                    newTab: 'Ctrl+T',
+                    closeTab: 'Ctrl+W',
+                    reload: 'Ctrl+R',
+                    history: 'Ctrl+H',
+                    bookmarks: 'Ctrl+B',
+                    commandPalette: 'Ctrl+K'
+                }
+            };
 
         this.settings = {};
         this.init();
@@ -5271,7 +5576,6 @@ class SettingsManager {
             const stored = localStorage.getItem(this.storageKey);
             this.settings = stored ? { ...this.defaults, ...JSON.parse(stored) } : { ...this.defaults };
         } catch (e) {
-            console.error('Failed to load settings:', e);
             this.settings = { ...this.defaults };
         }
     }
@@ -5280,7 +5584,6 @@ class SettingsManager {
         try {
             localStorage.setItem(this.storageKey, JSON.stringify(this.settings));
         } catch (e) {
-            console.error('Failed to save settings:', e);
         }
     }
 
@@ -5431,6 +5734,23 @@ class SettingsManager {
                             <span class="settings-radio-label">${e.name}</span>
                         </label>
                     `).join('')}
+                </div>
+            </div>
+            
+            <div class="settings-section">
+                <h3 class="settings-section-title">预设主页</h3>
+                <p class="settings-section-desc">设置浏览器启动和主页按钮使用的页面。</p>
+                <div class="settings-toggle-item">
+                    <div class="settings-toggle-info">
+                        <div class="settings-toggle-label">启用预设主页</div>
+                    </div>
+                    <div class="settings-toggle" data-setting="usePresetHomePage">
+                        <input type="checkbox" ${this.settings.usePresetHomePage ? 'checked' : ''}>
+                        <span class="settings-toggle-slider"></span>
+                    </div>
+                </div>
+                <div class="settings-info-box" style="margin-top: 8px;">
+                    <p>启用后将使用本地预设主页（preset-home.html），禁用则使用搜索引擎的主页。</p>
                 </div>
             </div>
         `;
@@ -5682,6 +6002,21 @@ class SettingsManager {
             });
         });
 
+        // Specific listener for preset home page toggle
+        const presetHomeToggle = document.querySelector('.settings-toggle[data-setting="usePresetHomePage"]');
+        if (presetHomeToggle) {
+            presetHomeToggle.addEventListener('click', () => {
+                // Toggle the state
+                const currentState = this.getSetting('usePresetHomePage');
+                this.setSetting('usePresetHomePage', !currentState);
+                // Update the UI
+                const input = presetHomeToggle.querySelector('input');
+                if (input) {
+                    input.checked = !currentState;
+                }
+            });
+        }
+
         // Radio buttons
         document.querySelectorAll('input[name="searchEngine"]').forEach(input => {
             input.addEventListener('change', (e) => {
@@ -5708,6 +6043,11 @@ class SettingsManager {
         // Custom URL input
         document.getElementById('customStartupUrl')?.addEventListener('change', (e) => {
             this.setSetting('customStartupUrl', e.target.value);
+        });
+
+        // Home page input
+        document.getElementById('customHomePage')?.addEventListener('change', (e) => {
+            this.setSetting('homePage', e.target.value);
         });
 
         // Sliders
@@ -5777,7 +6117,6 @@ class SettingsManager {
 
                     alert('✅ 所有知识数据已清除。\n知识模式已关闭。');
                 } catch (err) {
-                    console.error('Failed to clear knowledge data:', err);
                     alert('清除知识数据失败：' + err.message);
                 }
             }
@@ -5801,89 +6140,59 @@ class SettingsManager {
 // Initialize Application
 // ============================================
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('=== Flowmora Browser Initializing ===');
-
     // Setup incognito mode first
     setupIncognitoMode();
 
     // Initialize managers with error handling
     try {
         window.tabManager = new TabManager();
-        console.log('✓ TabManager initialized');
     } catch (e) {
-        console.error('✗ TabManager failed:', e);
     }
 
     try {
         window.themeManager = new ThemeManager();
-        console.log('✓ ThemeManager initialized');
     } catch (e) {
-        console.error('✗ ThemeManager failed:', e);
     }
 
     try {
         window.mainMenuManager = new MainMenuManager();
-        console.log('✓ MainMenuManager initialized');
     } catch (e) {
-        console.error('✗ MainMenuManager failed:', e);
     }
 
     try {
         window.downloadManager = new DownloadManager();
-        console.log('✓ DownloadManager initialized');
     } catch (e) {
-        console.error('✗ DownloadManager failed:', e);
     }
 
     try {
         window.commandPalette = new CommandPalette();
-        console.log('✓ CommandPalette initialized');
     } catch (e) {
-        console.error('✗ CommandPalette failed:', e);
     }
 
     try {
-        console.log('Creating SettingsManager...');
         const sm = new SettingsManager();
-        console.log('SettingsManager created:', sm);
         window.settingsManager = sm;
-        console.log('✓ SettingsManager initialized, window.settingsManager =', window.settingsManager);
     } catch (e) {
-        console.error('✗ SettingsManager failed:', e);
-        console.error('Stack trace:', e.stack);
     }
 
     // Initialize Knowledge Manager
     try {
-        console.log('Creating KnowledgeManager...');
         const km = new KnowledgeManager();
-        console.log('KnowledgeManager created:', km);
         window.knowledgeManager = km;
-        console.log('✓ KnowledgeManager initialized, window.knowledgeManager =', window.knowledgeManager);
     } catch (e) {
-        console.error('✗ KnowledgeManager failed:', e);
-        console.error('Stack trace:', e.stack);
     }
 
     // Initialize Knowledge Classifier
     try {
-        console.log('Creating KnowledgeClassifier...');
         const kc = new KnowledgeClassifier();
-        console.log('KnowledgeClassifier created:', kc);
         window.knowledgeClassifier = kc;
-        console.log('✓ KnowledgeClassifier initialized, window.knowledgeClassifier =', window.knowledgeClassifier);
     } catch (e) {
-        console.error('✗ KnowledgeClassifier failed:', e);
-        console.error('Stack trace:', e.stack);
     }
 
     // Initialize Knowledge Database (IndexedDB)
     try {
-        console.log('Creating KnowledgeDB...');
         const kdb = new KnowledgeDB();
         window.knowledgeDB = kdb;
-        console.log('✓ KnowledgeDB initialized, window.knowledgeDB =', window.knowledgeDB);
-
         // Set up auto-save for classified content
         window.addEventListener('pageContentClassified', async (event) => {
             const { content } = event.detail;
@@ -5897,48 +6206,31 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const exists = await window.knowledgeDB.hasURL(content.url);
                 if (exists) {
-                    console.log('📚 KnowledgeDB: URL already saved, skipping:', content.url);
                     return;
                 }
 
                 // Save to IndexedDB
                 const saved = await window.knowledgeDB.saveKnowledgeEntry(content);
-                console.log('💾 KnowledgeDB: Auto-saved knowledge entry:', saved);
-
                 // Get updated count
                 const count = await window.knowledgeDB.getKnowledgeCount();
-                console.log(`📊 KnowledgeDB: Total entries: ${count}`);
             } catch (err) {
-                console.error('KnowledgeDB: Failed to auto-save:', err);
             }
         });
-
-        console.log('✓ KnowledgeDB auto-save listener attached');
     } catch (e) {
-        console.error('✗ KnowledgeDB failed:', e);
-        console.error('Stack trace:', e.stack);
     }
 
     // Initialize Knowledge Panel Manager
     try {
-        console.log('Creating KnowledgePanelManager...');
         const kpm = new KnowledgePanelManager();
         window.knowledgePanelManager = kpm;
-        console.log('✓ KnowledgePanelManager initialized');
     } catch (e) {
-        console.error('✗ KnowledgePanelManager failed:', e);
-        console.error('Stack trace:', e.stack);
     }
 
     // Initialize Knowledge Book Exporter
     try {
-        console.log('Creating KnowledgeBookExporter...');
         const kbe = new KnowledgeBookExporter();
         window.knowledgeBookExporter = kbe;
-        console.log('✓ KnowledgeBookExporter initialized');
     } catch (e) {
-        console.error('✗ KnowledgeBookExporter failed:', e);
-        console.error('Stack trace:', e.stack);
     }
 
 
@@ -5946,20 +6238,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!CONFIG.isIncognito) {
         try {
             window.bookmarkManager = new BookmarkManager(window.tabManager);
-            console.log('✓ BookmarkManager initialized');
         } catch (e) {
-            console.error('✗ BookmarkManager failed:', e);
         }
 
         try {
-            console.log('Creating HistoryManager...');
             const hm = new HistoryManager(window.tabManager);
-            console.log('HistoryManager created:', hm);
             window.historyManager = hm;
-            console.log('✓ HistoryManager initialized, window.historyManager =', window.historyManager);
         } catch (e) {
-            console.error('✗ HistoryManager failed:', e);
-            console.error('Stack trace:', e.stack);
         }
 
 
@@ -5993,71 +6278,17 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    // Initialize Download Manager
-    try {
-        console.log('Creating DownloadManager...');
-        const dm = new DownloadManager();
-        window.downloadManager = dm;
-        console.log('✓ DownloadManager initialized');
-    } catch (e) {
-        console.error('✗ DownloadManager failed:', e);
-        console.error('Stack trace:', e.stack);
-    }
-
+    // Download Manager is already initialized at the top
     // Setup additional features
     updateTimeDisplay();
     setInterval(updateTimeDisplay, 1000);
 
-    // Setup nav action buttons with debug logging
+    // Setup nav action buttons
     const downloadsBtn = document.getElementById('downloadsBtn');
-    console.log('downloadsBtn element:', downloadsBtn);
     if (downloadsBtn) {
-        downloadsBtn.addEventListener('click', (e) => {
-            console.log('Downloads button clicked!');
-            e.stopPropagation();
-            if (window.downloadManager) {
-                console.log('Toggling download panel...');
-                window.downloadManager.togglePanel();
-            } else {
-                console.error('downloadManager not found!');
-            }
-        });
-        console.log('✓ Downloads button listener attached');
-    } else {
-        console.error('✗ downloadsBtn not found in DOM');
+        // Using DownloadManager's built-in listener
     }
 
-    const extensionsBtn = document.getElementById('extensionsBtn');
-    console.log('extensionsBtn element:', extensionsBtn);
-    if (extensionsBtn) {
-        extensionsBtn.addEventListener('click', (e) => {
-            console.log('Extensions button clicked!');
-            e.stopPropagation();
-            // Show a simple notification since extensions are not implemented
-            const notification = document.createElement('div');
-            notification.className = 'extension-notification';
-            notification.textContent = 'Extensions coming soon!';
-            notification.style.cssText = `
-                position: fixed;
-                top: 80px;
-                right: 20px;
-                padding: 12px 20px;
-                background: var(--bg-elevated);
-                border: 1px solid var(--border-default);
-                border-radius: var(--radius-md);
-                box-shadow: var(--shadow-lg);
-                color: var(--text-primary);
-                font-size: 13px;
-                z-index: 1000;
-                animation: fadeIn 0.2s ease-out;
-            `;
-            document.body.appendChild(notification);
-            setTimeout(() => notification.remove(), 2000);
-        });
-        console.log('✓ Extensions button listener attached');
-    } else {
-        console.error('✗ extensionsBtn not found in DOM');
-    }
 
     // ============================================
     // Window Control Buttons
@@ -6065,63 +6296,45 @@ document.addEventListener('DOMContentLoaded', () => {
     const minimizeBtn = document.querySelector('.window-btn.minimize');
     const maximizeBtn = document.querySelector('.window-btn.maximize');
     const closeBtn = document.querySelector('.window-btn.close');
-
-    console.log('Window control buttons:', { minimizeBtn, maximizeBtn, closeBtn });
-
     if (minimizeBtn) {
         minimizeBtn.addEventListener('click', (e) => {
-            console.log('Minimize button clicked!');
             e.stopPropagation();
             if (window.focusFlowAPI && window.focusFlowAPI.window) {
                 window.focusFlowAPI.window.minimize();
             }
         });
-        console.log('✓ Minimize button listener attached');
     } else {
-        console.error('✗ minimizeBtn not found in DOM');
     }
 
     if (maximizeBtn) {
         maximizeBtn.addEventListener('click', (e) => {
-            console.log('Maximize button clicked!');
             e.stopPropagation();
             if (window.focusFlowAPI && window.focusFlowAPI.window) {
                 window.focusFlowAPI.window.maximize();
             }
         });
-        console.log('✓ Maximize button listener attached');
     } else {
-        console.error('✗ maximizeBtn not found in DOM');
     }
 
     if (closeBtn) {
         closeBtn.addEventListener('click', (e) => {
-            console.log('Close button clicked!');
             e.stopPropagation();
             if (window.focusFlowAPI && window.focusFlowAPI.window) {
                 window.focusFlowAPI.window.close();
             }
         });
-        console.log('✓ Close button listener attached');
     } else {
-        console.error('✗ closeBtn not found in DOM');
     }
 
     // ============================================
     // Summarize Button - Rule-Based Summarization
     // ============================================
     const summarizeBtn = document.getElementById('summarizeBtn');
-    console.log('summarizeBtn element:', summarizeBtn);
-
     // Initialize summarizer and modal UI
     window.ruleSummarizer = new RuleBasedSummarizer();
     window.summaryModalUI = new SummaryModalUI();
-    console.log('✓ RuleBasedSummarizer initialized');
-    console.log('✓ SummaryModalUI initialized');
-
     if (summarizeBtn) {
         summarizeBtn.addEventListener('click', async (e) => {
-            console.log('Summarize button clicked!');
             e.stopPropagation();
 
             // Check if Knowledge Mode is ON
@@ -6176,36 +6389,24 @@ document.addEventListener('DOMContentLoaded', () => {
                     alert('No content found on this page to summarize.');
                     return;
                 }
-
-                console.log('📄 Page content extracted for summarization:', pageContent);
-
                 // Generate the summary using rule-based summarizer
                 const summaryResult = window.ruleSummarizer.summarize(pageContent);
-
-                console.log('✨ Summary result:', summaryResult);
-
                 // Show the summary modal
                 window.summaryModalUI.showSummaryModal(summaryResult);
 
             } catch (err) {
-                console.error('Failed to extract content for summarization:', err);
                 alert('Failed to extract content from this page.');
             }
         });
-        console.log('✓ Summarize button listener attached');
     } else {
-        console.error('✗ summarizeBtn not found in DOM');
     }
 
     // ============================================
     // PDF Export Button - Knowledge Book Export
     // ============================================
     const pdfExportBtn = document.getElementById('pdfExportBtn');
-    console.log('pdfExportBtn element:', pdfExportBtn);
-
     if (pdfExportBtn) {
         pdfExportBtn.addEventListener('click', async (e) => {
-            console.log('PDF Export button clicked!');
             e.stopPropagation();
 
             // Check if Knowledge Mode has any entries
@@ -6225,28 +6426,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Use the existing KnowledgeBookExporter if available
                 if (window.knowledgeBookExporter) {
                     window.knowledgeBookExporter.exportBook();
-                    console.log('📘 Exporting Knowledge Book via KnowledgeBookExporter');
                 } else {
                     // Fallback: Generate a simple HTML export
-                    console.log('📘 Generating Knowledge Book...');
                     const bookContent = generateKnowledgeBookHTML(entries);
                     downloadAsHTML(bookContent, 'Flowmora-Knowledge-Book.html');
                 }
             } catch (err) {
-                console.error('Failed to export Knowledge Book:', err);
                 alert('Failed to export Knowledge Book. Please try again.');
             }
         });
-        console.log('✓ PDF Export button listener attached');
     } else {
-        console.error('✗ pdfExportBtn not found in DOM');
     }
 
     // Debug: Add click listener to document to see if clicks are being captured
     document.addEventListener('click', (e) => {
-        console.log('Document click on:', e.target.tagName, e.target.id || e.target.className);
     }, true);
-
-    console.log('=== Flowmora Browser Initialized ===');
-    console.log(`Mode: ${CONFIG.isIncognito ? 'Incognito' : 'Normal'}`);
 });
+
