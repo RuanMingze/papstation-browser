@@ -1,19 +1,19 @@
 {
-  "name": "papstation-browser",
+  "name": "paperstation-browser",
   "version": "1.1.0",
   "description": "访问互联网",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "dev": "set NODE_ENV=development && electron .",
+    "dev": "cross-env NODE_ENV=development electron .",
     "build": "electron-builder --win --x64",
     "build:dir": "electron-builder --win --x64 --dir",
     "dist": "electron-builder --win --x64 --publish never",
     "pack": "electron-builder --dir"
   },
   "build": {
-    "appId": "com.papstation.browser",
-    "productName": "Papstation",
+    "appId": "com.paperstation.browser",
+    "productName": "PaperStation",
     "copyright": "Copyright © 2026 Ruanm",
     "directories": {
       "output": "dist"
@@ -43,7 +43,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Papstation"
+      "shortcutName": "PaperStation"
     },
     "asar": true,
     "compression": "maximum"
@@ -52,7 +52,7 @@
     "browser",
     "electron",
     "chromium",
-    "papstation"
+    "paperstation"
   ],
   "author": "RuanMingze",
   "license": "MIT",
@@ -62,6 +62,7 @@
   },
   "devDependencies": {
     "electron": "^40.2.1",
+    "cross-env": "^7.0.3",
     "electron-builder": "^25.1.8"
   }
 }

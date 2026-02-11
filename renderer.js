@@ -93,6 +93,7 @@ class TabManager {
         this.forwardBtn = document.getElementById('forwardBtn');
         this.reloadBtn = document.getElementById('reloadBtn');
         this.homeBtn = document.getElementById('homeBtn');
+        this.screenshotBtn = document.getElementById('screenshotBtn');
         this.newTabBtn = document.getElementById('newTabBtn');
         this.bookmarkBtn = document.getElementById('bookmarkBtn');
         this.pwaInstallBtn = document.getElementById('pwaInstallBtn');
@@ -278,12 +279,29 @@ class TabManager {
     }
 
     setupWebviewListeners(tabId, webview) {
-        // Context menu for webview
-        webview.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-            console.log('Webview context menu event triggered');
-            this.showWebviewContextMenu(e, tabId, webview);
-        });
+        // Context menu - disabled
+        // webview.addEventListener('contextmenu', (e) => {
+        //     // Log all relevant event properties
+        //     console.log('Context menu event details:', {
+        //         shiftKey: e.shiftKey,
+        //         button: e.button,
+        //         buttons: e.buttons,
+        //         ctrlKey: e.ctrlKey,
+        //         altKey: e.altKey,
+        //         metaKey: e.metaKey,
+        //         type: e.type,
+        //         target: e.target ? e.target.tagName : null
+        //     });
+        //     
+        //     // Check if Shift key is pressed
+        //     if (e.shiftKey) {
+        //         console.log('Shift key is pressed!');
+        //         e.preventDefault();
+        //         this.showWebviewContextMenu(e, tabId, webview);
+        //     } else {
+        //         console.log('Shift key is NOT pressed, allowing default context menu');
+        //     }
+        // });
 
         // Page title updated
         webview.addEventListener('page-title-updated', (e) => {
@@ -678,48 +696,8 @@ class TabManager {
     navigate(input) {
         let url = input.trim();
         
-        // Handle custom papstation:// protocol
-        if (url.startsWith('papstation://')) {
-            const path = url.substring('papstation://'.length);
-            
-            switch (path) {
-                case 'settings':
-                    // Open settings panel
-                    if (window.settingsManager) {
-                        window.settingsManager.togglePanel();
-                    } else {
-                        alert('设置面板不可用 - settingsManager 未初始化');
-                    }
-                    return;
-                case 'dino':
-                    // Open dinosaur game
-                    url = './errors/chrome-dinosaur-game/index.html';
-                    break;
-                case 'downloads':
-                    // Open downloads panel
-                    if (window.downloadManager) {
-                        window.downloadManager.togglePanel(true);
-                    } else {
-                        alert('下载面板不可用 - downloadManager 未初始化');
-                    }
-                    return;
-                case 'knowledge':
-                    // Open knowledge panel
-                    if (window.knowledgePanelManager) {
-                        window.knowledgePanelManager.open();
-                    } else {
-                        alert('知识面板不可用 - knowledgePanelManager 未初始化');
-                    }
-                    return;
-                default:
-                    // Invalid papstation protocol
-                    alert('无效的 Papstation 协议: ' + path);
-                    return;
-            }
-        }
-        
         // Use normalizeUrl directly to handle all cases correctly
-        url = this.normalizeUrl(url);
+        url = this.normalizeUrl(input);
         
         const tab = this.tabs.get(this.activeTabId);
 
@@ -883,6 +861,100 @@ class TabManager {
         }).catch(err => {
             this.setStatus('PWA 安装失败');
         });
+    }
+
+    async captureScreenshot() {
+        const tab = this.tabs.get(this.activeTabId);
+        if (!tab || !tab.webview) {
+            this.showNotification('截图失败', '没有找到活动标签页或webview');
+            return;
+        }
+
+        try {
+            const webview = tab.webview;
+            
+            if (typeof webview.capturePage !== 'function') {
+                throw new Error('Webview does not support capturePage method');
+            }
+            
+            let image;
+            try {
+                image = await webview.capturePage();
+            } catch (e) {
+                throw new Error('Capture failed: ' + e.message);
+            }
+            
+            if (!image || typeof image.toDataURL !== 'function') {
+                throw new Error('Invalid image object');
+            }
+            
+            console.log('[DEBUG] Converting image to data URL...');
+            const dataUrl = image.toDataURL();
+            console.log('[DEBUG] Data URL generated, length:', dataUrl ? dataUrl.length : 0);
+            console.log('[DEBUG] Data URL prefix:', dataUrl ? dataUrl.substring(0, 50) : 'null');
+
+            console.log('[DEBUG] Data URL received, type:', typeof dataUrl);
+
+            if (!dataUrl || typeof dataUrl !== 'string') {
+                console.error('[DEBUG] Invalid data URL type');
+                throw new Error('Invalid data URL: must be a string');
+            }
+
+            if (!dataUrl.startsWith('data:image/png;base64,')) {
+                console.error('[DEBUG] Invalid data URL format');
+                throw new Error('Invalid data URL format: must be a PNG image');
+            }
+
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const filename = `screenshot-${timestamp}.png`;
+            console.log('[DEBUG] Filename generated:', filename);
+            
+            if (!window.focusFlowAPI || !window.focusFlowAPI.file || !window.focusFlowAPI.file.saveImage) {
+                console.error('[DEBUG] FocusFlow API not available');
+                throw new Error('FocusFlow API not available');
+            }
+
+            console.log('[DEBUG] Calling saveImage with dataUrl length:', dataUrl.length);
+            
+            const result = await window.focusFlowAPI.file.saveImage(dataUrl, filename);
+            
+            console.log('[DEBUG] saveImage result:', result);
+            
+            if (result && result.success) {
+                console.log('Screenshot saved to:', result.filePath);
+                this.showNotification('截图已保存', `文件已保存到: ${result.filePath}`);
+            } else {
+                console.error('Failed to save screenshot:', result.error);
+                this.showNotification('保存失败', result.error || '未知错误');
+            }
+        } catch (error) {
+            console.error('[DEBUG] Error in captureScreenshot:', error);
+            console.error('[DEBUG] Error stack:', error.stack);
+            this.showNotification('截图失败', error.message || '未知错误');
+        }
+    }
+
+    showNotification(title, message) {
+        const notification = document.createElement('div');
+        notification.className = 'notification';
+        notification.innerHTML = `
+            <div class="notification-content">
+                <div class="notification-title">${title}</div>
+                <div class="notification-message">${message}</div>
+            </div>
+        `;
+        document.body.appendChild(notification);
+
+        setTimeout(() => {
+            notification.classList.add('show');
+        }, 10);
+
+        setTimeout(() => {
+            notification.classList.remove('show');
+            setTimeout(() => {
+                notification.remove();
+            }, 300);
+        }, 3000);
     }
 
     showWebviewContextMenu(e, tabId, webview) {
@@ -1054,42 +1126,8 @@ class TabManager {
     // ============================================
 
     updateUrlBar(url) {
-        // For new tab pages, always show empty address bar
-        // This works regardless of whether preset home page is enabled or not
         if (url && url !== 'about:blank') {
-            // Check if this is a home page by domain and path
-            const homePageDomains = [
-                'google.com',
-                'bing.com',
-                'duckduckgo.com',
-                'yahoo.com',
-                'ecosia.org',
-                'ruanmingze.github.io'
-            ];
-            
-            let isHomePageRoot = false;
-            try {
-                const urlObj = new URL(url);
-                const domain = urlObj.hostname;
-                const pathname = urlObj.pathname;
-                
-                // Check if domain is a home page domain AND path is root (/) or empty
-                isHomePageRoot = homePageDomains.some(homeDomain => 
-                    (domain === homeDomain || domain.endsWith('.' + homeDomain)) && 
-                    (pathname === '/' || pathname === '')
-                );
-            } catch (e) {
-                // Invalid URL, not a home page
-            }
-            
-            // Check if this is a local preset home page
-            const isLocalPresetHome = url.includes('preset-home.html');
-            
-            if (!isHomePageRoot && !isLocalPresetHome) {
-                this.urlInput.value = url;
-            } else {
-                this.urlInput.value = '';
-            }
+            this.urlInput.value = url;
         } else {
             this.urlInput.value = '';
         }
@@ -1130,6 +1168,7 @@ class TabManager {
         this.forwardBtn.addEventListener('click', () => this.goForward());
         this.reloadBtn.addEventListener('click', () => this.reload());
         this.homeBtn.addEventListener('click', () => this.goHome());
+        this.screenshotBtn.addEventListener('click', () => this.captureScreenshot());
 
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
@@ -4703,7 +4742,7 @@ class DownloadManager {
         // Listen for download events from main process
         window.focusFlowAPI.downloads.onStarted((data) => {
             this.addDownload(data);
-            this.showNotification(`下载开始: ${data.filename}`);
+            this.showNotification(`Download started: ${data.filename}`);
         });
 
         window.focusFlowAPI.downloads.onProgress((data) => {
@@ -4713,9 +4752,9 @@ class DownloadManager {
         window.focusFlowAPI.downloads.onCompleted((data) => {
             this.completeDownload(data);
             if (data.state === 'completed') {
-                this.showNotification(`下载完成: ${data.filename}`, 'success');
+                this.showNotification(`Download completed: ${data.filename}`, 'success');
             } else {
-                this.showNotification(`下载失败: ${data.filename}`, 'error');
+                this.showNotification(`Download failed: ${data.filename}`, 'error');
             }
         });
     }
@@ -4830,9 +4869,9 @@ class DownloadManager {
         panel.className = 'download-panel';
         panel.innerHTML = `
             <div class="download-panel-header">
-                <h3>下载</h3>
+                <h3>Downloads</h3>
                 <div class="download-panel-actions">
-                    <button class="download-clear-btn" id="clearDownloadsBtn" title="清除已完成">
+                    <button class="download-clear-btn" id="clearDownloadsBtn" title="Clear completed">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <polyline points="3 6 5 6 21 6"/>
                             <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
@@ -4852,7 +4891,7 @@ class DownloadManager {
                         <polyline points="7 10 12 15 17 10"/>
                         <line x1="12" y1="15" x2="12" y2="3"/>
                     </svg>
-                    <p>暂无下载项</p>
+                    <p>No downloads</p>
                 </div>
             </div>
         `;
@@ -4905,7 +4944,7 @@ class DownloadManager {
                         <polyline points="7 10 12 15 17 10"/>
                         <line x1="12" y1="15" x2="12" y2="3"/>
                     </svg>
-                    <p>暂无下载项</p>
+                    <p>No downloads</p>
                 </div>
             `;
             return;
@@ -4940,36 +4979,36 @@ class DownloadManager {
             case 'progressing':
                 statusText = `${received} / ${size} (${progress}%)`;
                 actionButtons = `
-                    <button class="download-action pause" data-id="${download.id}" title="暂停">
+                    <button class="download-action pause" data-id="${download.id}" title="Pause">
                         <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
                     </button>
-                    <button class="download-action cancel" data-id="${download.id}" title="取消">
+                    <button class="download-action cancel" data-id="${download.id}" title="Cancel">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
                     </button>
                 `;
                 break;
             case 'paused':
-                statusText = `已暂停 - ${received} / ${size}`;
+                statusText = `Paused - ${received} / ${size}`;
                 actionButtons = `
-                    <button class="download-action resume" data-id="${download.id}" title="继续">
+                    <button class="download-action resume" data-id="${download.id}" title="Resume">
                         <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                     </button>
-                    <button class="download-action cancel" data-id="${download.id}" title="取消">
+                    <button class="download-action cancel" data-id="${download.id}" title="Cancel">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
                     </button>
                 `;
                 break;
             case 'completed':
-                statusText = `已完成 - ${size}`;
+                statusText = `Completed - ${size}`;
                 actionButtons = `
-                    <button class="download-action open" data-path="${download.savePath}" title="打开">
+                    <button class="download-action open" data-path="${download.savePath}" title="Open">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
                             <polyline points="15 3 21 3 21 9"/>
                             <line x1="10" y1="14" x2="21" y2="3"/>
                         </svg>
                     </button>
-                    <button class="download-action folder" data-path="${download.savePath}" title="在文件夹中显示">
+                    <button class="download-action folder" data-path="${download.savePath}" title="Show in folder">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
                         </svg>
@@ -4978,7 +5017,7 @@ class DownloadManager {
                 break;
             case 'cancelled':
             case 'interrupted':
-                statusText = `失败`;
+                statusText = `Failed`;
                 actionButtons = '';
                 break;
         }
@@ -6000,12 +6039,12 @@ class SettingsManager {
 
     formatShortcutName(key) {
         const names = {
-            newTab: '新建标签页',
-            closeTab: '关闭标签页',
-            reload: '刷新页面',
-            history: '打开历史记录',
-            bookmarks: '打开书签',
-            commandPalette: '命令面板'
+            newTab: 'New Tab',
+            closeTab: 'Close Tab',
+            reload: 'Reload Page',
+            history: 'Open History',
+            bookmarks: 'Open Bookmarks',
+            commandPalette: 'Command Palette'
         };
         return names[key] || key;
     }

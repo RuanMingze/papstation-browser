@@ -60,7 +60,7 @@ contextBridge.exposeInMainWorld('focusFlowAPI', {
     },
 
     onMessage: (channel, callback) => {
-        const validChannels = ['navigation-update', 'tab-update'];
+        const validChannels = ['navigation-update', 'tab-update', 'fullscreen-changed'];
         if (validChannels.includes(channel)) {
             ipcRenderer.on(channel, (event, ...args) => callback(...args));
         }
@@ -87,7 +87,8 @@ contextBridge.exposeInMainWorld('focusFlowAPI', {
     window: {
         minimize: () => ipcRenderer.invoke('window-minimize'),
         maximize: () => ipcRenderer.invoke('window-maximize'),
-        close: () => ipcRenderer.invoke('window-close')
+        close: () => ipcRenderer.invoke('window-close'),
+        toggleFullScreen: () => ipcRenderer.invoke('window-toggle-fullscreen')
     },
 
     // ============================================
@@ -97,6 +98,32 @@ contextBridge.exposeInMainWorld('focusFlowAPI', {
         goBack: (webviewId) => ipcRenderer.invoke('webview-go-back', webviewId),
         goForward: (webviewId) => ipcRenderer.invoke('webview-go-forward', webviewId),
         savePage: (webviewId) => ipcRenderer.invoke('webview-save-page', webviewId),
-        openDevTools: (webviewId) => ipcRenderer.invoke('webview-open-devtools', webviewId)
+        openDevTools: (webviewId) => ipcRenderer.invoke('webview-open-devtools', webviewId),
+        capturePage: (webviewId) => ipcRenderer.invoke('webview-capture-page', webviewId)
+    },
+
+    // ============================================
+    // File System API
+    // ============================================
+    file: {
+        saveImage: (dataUrl, filename) => {
+            console.log('[DEBUG preload] saveImage called with dataUrl length:', dataUrl ? dataUrl.length : 0, 'filename:', filename);
+            console.log('[DEBUG preload] Preparing to invoke file-save-image');
+            const payload = { dataUrl, filename };
+            console.log('[DEBUG preload] Payload type:', typeof payload, 'keys:', Object.keys(payload));
+            console.log('[DEBUG preload] Payload dataUrl type:', typeof payload.dataUrl);
+            console.log('[DEBUG preload] Payload filename type:', typeof payload.filename);
+            return ipcRenderer.invoke('file-save-image', payload);
+        }
+    },
+
+    // ============================================
+    // Password Manager API
+    // ============================================
+    passwordManager: {
+        savePassword: (data) => ipcRenderer.invoke('password-save', data),
+        getPasswords: () => ipcRenderer.invoke('password-get-all'),
+        deletePassword: (id) => ipcRenderer.invoke('password-delete', id),
+        verifyWithHello: () => ipcRenderer.invoke('password-verify-hello')
     }
 });

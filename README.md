@@ -1,6 +1,6 @@
-# Papstation Browser
+# PaperStation Browser
 
-<h1 align="center">Papstation Browser</h1>
+<h1 align="center">PaperStation Browser</h1>
 
 <p align="center">
   <strong>🎯 全面发展的现代化浏览器，基于 Electron+Chromium 打造</strong>
@@ -25,11 +25,11 @@
 
 ## 🚀 核心优势
 
-Papstation Browser 最初基于 Flowmora Browser 二次开发，现已独立发展成为一个全面发展的现代化浏览器项目，提供丰富的功能和流畅的用户体验。
+PaperStation Browser 最初基于 Flowmora Browser 二次开发，现已独立发展成为一个全面发展的现代化浏览器项目，提供丰富的功能和流畅的用户体验。
 
-**注**：Flowmora Browser 项目似乎已停止更新，Papstation Browser 在此基础上进行了全面的功能增强和技术改进，成为一个独立维护的完整项目。
+**注**：Flowmora Browser 项目似乎已停止更新，PaperStation Browser 在此基础上进行了全面的功能增强和技术改进，成为一个独立维护的完整项目。
 
-| 特性 | Chrome/Edge | Papstation |
+| 特性 | Chrome/Edge | PaperStation |
 |------|:-----------:|:----------:|
 | 🧠 知识捕获模式 | ❌ | ✅ |
 | 📝 智能总结功能 | ❌ | ✅ |
@@ -90,8 +90,8 @@ Papstation Browser 最初基于 Flowmora Browser 二次开发，现已独立发�
 
 1. **克隆仓库**
    ```bash
-   git clone https://github.com/ruanmingze/papstation-browser.git
-   cd papstation-browser
+   git clone https://github.com/ruanmingze/PaperStation-browser.git
+   cd PaperStation-browser
    ```
 
 2. **安装依赖**
@@ -109,7 +109,7 @@ Papstation Browser 最初基于 Flowmora Browser 二次开发，现已独立发�
 - **创建 Windows 安装包**
   ```bash
   pnpm run build
-  # 输出: dist/Papstation Browser Setup.exe
+  # 输出: dist/PaperStation Browser Setup.exe
   ```
 
 - **创建免安装版本**
@@ -149,7 +149,7 @@ Papstation Browser 最初基于 Flowmora Browser 二次开发，现已独立发�
 本项目采用 MIT 许可证 - 详见 [LICENSE](LICENSE) 文件
 
 ### 基于 Flowmora Browser
-Papstation Browser 基于 Flowmora Browser 二次开发，后者同样采用 MIT 许可证。
+PaperStation Browser 基于 Flowmora Browser 二次开发，后者同样采用 MIT 许可证。
 
 ## 📧 反馈方式
 

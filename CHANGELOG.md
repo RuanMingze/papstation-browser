@@ -1,6 +1,6 @@
 # 更新日志
 
-所有与 Papstation 浏览器相关的重大变更都将记录在此文件中。
+所有与 PaperStation 浏览器相关的重大变更都将记录在此文件中。
 
 此格式基于 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)，
 并且此项目遵循 [语义化版本控制](https://semver.org/spec/v2.0.0.html)。
@@ -15,10 +15,10 @@
   - 所有菜单项已完全汉化为中文
 
 - **自定义协议支持** - 添加了浏览器内协议：
-  - `papstation://settings` - 打开设置菜单
-  - `papstation://dino` - 打开恐龙游戏
-  - `papstation://downloads` - 打开下载面板
-  - `papstation://knowledge` - 打开"我的知识"页面
+  - `PaperStation://settings` - 打开设置菜单
+  - `PaperStation://dino` - 打开恐龙游戏
+  - `PaperStation://downloads` - 打开下载面板
+  - `PaperStation://knowledge` - 打开"我的知识"页面
 
 ### 技术变更
 
@@ -52,11 +52,11 @@
 
 ## [1.0.0] - 2024-12-11
 
-### 🎉 Papstation 浏览器初始发布
+### 🎉 PaperStation 浏览器初始发布
 
 #### 基于 Flowmora 浏览器
 
-Papstation 浏览器基于 Flowmora 浏览器，后者在 MIT 许可证下发布。
+PaperStation 浏览器基于 Flowmora 浏览器，后者在 MIT 许可证下发布。
 
 #### 新增功能
 - **核心浏览器功能**
@@ -101,7 +101,7 @@ Papstation 浏览器基于 Flowmora 浏览器，后者在 MIT 许可证下发布
   - 暂停/恢复/取消下载
   - 打开文件或在文件夹中显示
 
-- **Papstation 独家功能**
+- **PaperStation 独家功能**
   - **ChickRubGo 搜索引擎** 🐔 - 集成搜索引擎
   - **完整中文本地化** 🌍 - 完整的中文语言支持
   - **增强的相对路径处理** - 改进了相对 URL 的导航

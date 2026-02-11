@@ -1,5 +1,5 @@
 ---
-title: 'Papstation Browser: A Knowledge-Focused Desktop Browser for Enhanced Learning and Research'
+title: 'PaperStation Browser: A Knowledge-Focused Desktop Browser for Enhanced Learning and Research'
 tags:
   - JavaScript
   - Electron
@@ -20,13 +20,13 @@ bibliography: paper.bib
 
 # Summary
 
-Papstation Browser is an open-source, Electron-based desktop web browser designed specifically for knowledge-focused browsing. It is based on Flowmora Browser and inherits its core features while adding additional enhancements. Unlike conventional browsers that prioritize general web navigation, Papstation introduces a unique "Knowledge Mode" that enables users to automatically capture, organize, and export information from web pages they visit. The browser addresses the growing need for efficient information management tools in educational and research contexts.
+PaperStation Browser is an open-source, Electron-based desktop web browser designed specifically for knowledge-focused browsing. It is based on Flowmora Browser and inherits its core features while adding additional enhancements. Unlike conventional browsers that prioritize general web navigation, PaperStation introduces a unique "Knowledge Mode" that enables users to automatically capture, organize, and export information from web pages they visit. The browser addresses the growing need for efficient information management tools in educational and research contexts.
 
 # Statement of Need
 
 Modern web browsing often involves extensive research and learning activities. Students, researchers, and lifelong learners frequently switch between consuming web content and taking notes in separate applications, leading to fragmented workflows and lost context. Existing browsers lack native features for knowledge capture and organization.
 
-Papstation Browser addresses this gap by integrating knowledge management directly into the browsing experience. The software provides:
+PaperStation Browser addresses this gap by integrating knowledge management directly into the browsing experience. The software provides:
 
 1. **Knowledge Mode**: An innovative feature that automatically tracks and saves important content from visited pages, eliminating the need for manual copy-paste workflows.
 
@@ -38,7 +38,7 @@ Papstation Browser addresses this gap by integrating knowledge management direct
 
 # Implementation
 
-Papstation Browser is built using Electron 40.1.0 [@electron2023], combining the Chromium rendering engine with Node.js for cross-platform desktop functionality. It is based on Flowmora Browser and maintains the same core architecture, which consists of three main components:
+PaperStation Browser is built using Electron 40.1.0 [@electron2023], combining the Chromium rendering engine with Node.js for cross-platform desktop functionality. It is based on Flowmora Browser and maintains the same core architecture, which consists of three main components:
 
 - **Main Process** (`main.js`): Manages application lifecycle, window creation, and system-level operations with context isolation for security.
 - **Renderer Process** (`renderer.js`): Handles the user interface, tab management, bookmarks, and the Knowledge Mode functionality.
@@ -67,7 +67,7 @@ Data persistence is achieved through IndexedDB for storing captured knowledge, b
 
 # Availability
 
-Papstation Browser is freely available under the MIT License. It is based on Flowmora Browser, which is also available under the MIT License. The source code is hosted on GitHub.
+PaperStation Browser is freely available under the MIT License. It is based on Flowmora Browser, which is also available under the MIT License. The source code is hosted on GitHub.
 
 # Acknowledgements
 

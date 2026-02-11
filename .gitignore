@@ -70,3 +70,6 @@ electron-builder.yml
 # Test outputs
 test-results/
 playwright-report/
+
+# zip files
+*.zip

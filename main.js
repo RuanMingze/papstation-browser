@@ -19,7 +19,7 @@ function createWindow() {
     mainWindow = new BrowserWindow({
         width: 1200,
         height: 800,
-        title: 'Papstation',
+        title: 'PaperStation',
         icon: path.join(__dirname, 'assets/icon.png'),
         frame: false,
         autoHideMenuBar: true,
@@ -43,8 +43,10 @@ function createWindow() {
     // Load the index.html of the app
     mainWindow.loadFile('index.html');
 
-    // Open DevTools (disabled)
-    // mainWindow.webContents.openDevTools();
+    // Open DevTools in development mode only
+    if (isDev) {
+        mainWindow.webContents.openDevTools();
+    }
 
     // Handle window closed
     mainWindow.on('closed', () => {
@@ -239,6 +241,115 @@ ipcMain.handle('window-close', (event) => {
     return false;
 });
 
+ipcMain.handle('window-toggle-fullscreen', (event) => {
+    const window = event.sender.getOwnerBrowserWindow();
+    if (window && !window.isDestroyed()) {
+        const isFullScreen = !window.isFullScreen();
+        window.setFullScreen(isFullScreen);
+        
+        // Notify renderer about fullscreen state change
+        event.sender.send('fullscreen-changed', isFullScreen);
+        
+        return true;
+    }
+    return false;
+});
+
+// ============================================
+// Password Manager with Windows Hello
+// ============================================
+const { exec } = require('child_process');
+const fs = require('fs');
+
+const passwordsPath = path.join(app.getPath('userData'), 'passwords.json');
+
+function loadPasswords() {
+    try {
+        if (fs.existsSync(passwordsPath)) {
+            const data = fs.readFileSync(passwordsPath, 'utf8');
+            return JSON.parse(data);
+        }
+    } catch (error) {
+        console.error('Error loading passwords:', error);
+    }
+    return [];
+}
+
+function savePasswords(passwords) {
+    try {
+        fs.writeFileSync(passwordsPath, JSON.stringify(passwords, null, 2), 'utf8');
+        return true;
+    } catch (error) {
+        console.error('Error saving passwords:', error);
+        return false;
+    }
+}
+
+ipcMain.handle('password-save', async (event, data) => {
+    try {
+        const passwords = loadPasswords();
+        
+        // Check if password already exists
+        const existingIndex = passwords.findIndex(p => p.site === data.site && p.username === data.username);
+        
+        if (existingIndex >= 0) {
+            passwords[existingIndex] = { ...passwords[existingIndex], ...data, updatedAt: new Date().toISOString() };
+        } else {
+            passwords.push({ ...data, id: Date.now(), createdAt: new Date().toISOString() });
+        }
+        
+        savePasswords(passwords);
+        return { success: true };
+    } catch (error) {
+        console.error('Error saving password:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+ipcMain.handle('password-get-all', async (event) => {
+    try {
+        const passwords = loadPasswords();
+        return { success: true, passwords };
+    } catch (error) {
+        console.error('Error getting passwords:', error);
+        return { success: false, error: error.message, passwords: [] };
+    }
+});
+
+ipcMain.handle('password-delete', async (event, id) => {
+    try {
+        const passwords = loadPasswords();
+        const filteredPasswords = passwords.filter(p => p.id !== id);
+        savePasswords(filteredPasswords);
+        return { success: true };
+    } catch (error) {
+        console.error('Error deleting password:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+ipcMain.handle('password-verify-hello', async (event) => {
+    try {
+        if (process.platform !== 'win32') {
+            return { success: false, error: 'Windows Hello is only available on Windows' };
+        }
+
+        return new Promise((resolve) => {
+            exec('powershell -Command "Add-Type -AssemblyName System.Runtime.WindowsRuntime; [Windows.Security.Credentials.UI.CredentialPicker,Windows.Security.Credentials.UI,ContentType=WindowsRuntime] | Out-Null"', (error) => {
+                if (error) {
+                    console.error('Windows Hello error:', error);
+                    resolve({ success: false, error: 'Windows Hello not available' });
+                } else {
+                    resolve({ success: true });
+                }
+            });
+        });
+    } catch (error) {
+        console.error('Error verifying with Windows Hello:', error);
+        return { success: false, error: error.message };
+    }
+});
+
 ipcMain.handle('webview-go-back', (event, webviewId) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
         return mainWindow.webContents.executeJavaScript(`
@@ -343,6 +454,59 @@ ipcMain.handle('webview-open-devtools', (event, webviewId) => {
     return false;
 });
 
+ipcMain.handle('webview-capture-page', async (event, webviewId) => {
+    return { success: false, error: 'Use captureScreenshot in renderer process instead' };
+});
+
+ipcMain.handle('file-save-image', async (event, { dataUrl, filename }) => {
+    try {
+        if (!dataUrl || typeof dataUrl !== 'string') {
+            console.error('[DEBUG main] Invalid data URL: must be a string');
+            return { success: false, error: 'Invalid data URL: must be a string' };
+        }
+
+        if (!filename || typeof filename !== 'string') {
+            console.error('[DEBUG main] Invalid filename: must be a string');
+            return { success: false, error: 'Invalid filename: must be a string' };
+        }
+
+        if (!dataUrl.startsWith('data:image/png;base64,')) {
+            console.error('[DEBUG main] Invalid data URL format: must be a PNG image');
+            return { success: false, error: 'Invalid data URL format: must be a PNG image' };
+        }
+
+        const base64Data = dataUrl.replace(/^data:image\/png;base64,/, '');
+        console.log('[DEBUG main] base64Data length:', base64Data.length);
+        
+        if (base64Data.length === 0) {
+            console.error('[DEBUG main] Empty image data');
+            return { success: false, error: 'Empty image data' };
+        }
+
+        console.log('[DEBUG main] Decoding base64 to buffer...');
+        const buffer = Buffer.from(base64Data, 'base64');
+        console.log('[DEBUG main] Buffer created, size:', buffer.length);
+        
+        if (buffer.length === 0) {
+            console.error('[DEBUG main] Failed to decode image data');
+            return { success: false, error: 'Failed to decode image data' };
+        }
+        
+        const downloadsPath = app.getPath('downloads');
+        const filePath = path.join(downloadsPath, filename);
+        console.log('[DEBUG main] Saving to:', filePath);
+        
+        fs.writeFileSync(filePath, buffer);
+        console.log('[DEBUG main] File saved successfully');
+        
+        return { success: true, filePath };
+    } catch (error) {
+        console.error('[DEBUG main] Error saving image:', error);
+        console.error('[DEBUG main] Error stack:', error.stack);
+        return { success: false, error: error.message || 'Unknown error occurred' };
+    }
+});
+
 // ============================================
 // Incognito Mode
 // ============================================
@@ -355,7 +519,7 @@ function createIncognitoWindow() {
     const incognitoWindow = new BrowserWindow({
         width: 1200,
         height: 800,
-        title: 'Papstation - 隐私模式',
+        title: 'PaperStation - 隐私模式',
         icon: path.join(__dirname, 'assets/icon.png'),
         frame: false,
         autoHideMenuBar: true,
