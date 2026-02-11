@@ -162,5 +162,4 @@ PaperStation Browser 基于 Flowmora Browser 二次开发，后者同样采用 M
 
 <p align="center">
   Made with ❤️ 全面发展的现代化浏览器
-
 </p>
